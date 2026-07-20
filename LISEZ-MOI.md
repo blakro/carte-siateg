@@ -44,6 +44,11 @@ Un sélecteur sous le QR permet de basculer en mode **« Contact direct »**
 (vCard pure) : utile si le réseau du forum est saturé, car ce mode fonctionne
 sans aucune connexion chez la personne qui scanne (mais n'apporte pas l'app).
 
+## Thème jour / nuit
+Le bouton en haut (AUTO / JOUR / NUIT) adapte les couleurs : **Jour** = contrastes
+forts pour lire en plein soleil, **Nuit** = sombre pour les salles, **Auto** = suit
+le réglage du téléphone. Le choix est mémorisé.
+
 ## Onglet Agenda
 Un 4ᵉ onglet **Agenda** affiche le programme du forum sous forme de frise :
 heure, type de session (panel, conférence…), présentiel/hybride, intervenants et
