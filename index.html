@@ -38,6 +38,11 @@
   --place:#8ab4ff;
   --place-bg:rgba(138,180,255,.1);
   --accent-strong:var(--accent-soft); /* accent lisible sur les fonds du thème */
+  --cat-panel:#60A5FA;
+  --cat-conf:#C084FC;
+  --cat-ws:#4ADE80;
+  --cat-cer:#FF8A5B;
+  --cat-brk:#64748B;
 }
 /* mode Jour : contrastes forts pour la lecture en plein soleil */
 :root[data-theme="light"]{
@@ -57,6 +62,11 @@
   --place:#1d4ed8;
   --place-bg:rgba(29,78,216,.08);
   --accent-strong:#C93A00; /* orange assombri : lisible sur fond clair */
+  --cat-panel:#1d4ed8;
+  --cat-conf:#7c3aed;
+  --cat-ws:#15803D;
+  --cat-cer:#C93A00;
+  --cat-brk:#64748B;
 }
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -250,6 +260,8 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   cursor:pointer;margin-top:2px;transition:transform .12s,filter .12s;}
 .install-chip:active{transform:scale(.95);}
 .install-chip:hover{filter:brightness(1.08);}
+/* l'attribut hidden doit gagner sur display:inline-flex (sinon le bouton reste visible) */
+.install-chip[hidden]{display:none!important;}
 
 /* iOS install steps */
 .ios-step{display:flex;gap:13px;align-items:flex-start;margin-bottom:14px;}
@@ -357,6 +369,39 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   border-radius:9px;padding:8px 11px;font-size:12px;font-weight:600;font-family:'Space Grotesk';
   cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
 .slot-ics:active{transform:scale(.95);}
+
+/* couleurs par type de session */
+.slot .slot-card{border-left:4px solid var(--line);}
+.slot.cat-panel .slot-card{border-left-color:var(--cat-panel);}
+.slot.cat-conf .slot-card{border-left-color:var(--cat-conf);}
+.slot.cat-ws .slot-card{border-left-color:var(--cat-ws);}
+.slot.cat-cer .slot-card{border-left-color:var(--cat-cer);}
+.slot.cat-brk .slot-card{border-left-color:var(--cat-brk);}
+.slot.cat-panel:not(.now)::before{border-color:var(--cat-panel);}
+.slot.cat-conf:not(.now)::before{border-color:var(--cat-conf);}
+.slot.cat-ws:not(.now)::before{border-color:var(--cat-ws);}
+.slot.cat-cer:not(.now)::before{border-color:var(--cat-cer);}
+.slot.cat-brk:not(.now)::before{border-color:var(--cat-brk);}
+.slot.cat-panel .stag.kind{color:var(--cat-panel);background:transparent;border:1px solid currentColor;}
+.slot.cat-conf .stag.kind{color:var(--cat-conf);background:transparent;border:1px solid currentColor;}
+.slot.cat-ws .stag.kind{color:var(--cat-ws);background:transparent;border:1px solid currentColor;}
+.slot.cat-cer .stag.kind{color:var(--cat-cer);background:transparent;border:1px solid currentColor;}
+.slot.cat-brk .stag.kind{color:var(--cat-brk);background:transparent;border:1px solid currentColor;}
+
+/* onglets Jour 1 / Jour 2 + swipe */
+.day-tabs{display:flex;gap:9px;margin:0 2px 8px;}
+.day-tab{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--muted);
+  border-radius:12px;padding:11px 8px;font-family:'Space Grotesk';font-weight:600;
+  font-size:13px;cursor:pointer;transition:.15s;}
+.day-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.day-sub{font-family:'Space Mono';font-size:10.5px;color:var(--muted);
+  text-align:center;margin:0 2px 12px;letter-spacing:.04em;}
+.swipe-hint{text-align:center;font-family:'Space Mono';font-size:9.5px;color:var(--muted);
+  opacity:.7;margin:-4px 0 10px;letter-spacing:.08em;}
+.legend{display:flex;flex-wrap:wrap;gap:7px 12px;margin:0 2px 14px;}
+.legend .lg{display:inline-flex;align-items:center;gap:5px;font-family:'Space Mono';
+  font-size:9.5px;color:var(--muted);letter-spacing:.03em;}
+.legend .lg i{width:9px;height:9px;border-radius:3px;}
 
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important;}
@@ -1157,8 +1202,23 @@ async function saveAllToPhone(){
 }
 
 /* ---- agenda / programme ---- */
-let progTimer=null;
+let progTimer=null, progDay=null;
 function fmtHM(t){ return t.replace(':','h'); }
+// catégorie d'une session → couleur (toutes les pauses pareil, tous les panels pareil, etc.)
+function catOf(s){
+  if(s.brk) return 'brk';
+  const k=(s.kind||'').toLowerCase();
+  if(k.includes('workshop')||k.includes('atelier')) return 'ws';
+  if(k.includes('panel')) return 'panel';
+  if(k.includes('cérémonie')||k.includes('ceremonie')||k.includes('ouverture')||k.includes('clôture')||k.includes('cloture')) return 'cer';
+  return 'conf';
+}
+function setProgDay(i){
+  if(i<0||i>=PROGRAM.days.length||i===progDay) return;
+  progDay=i; renderProgram();
+  // petite animation de transition
+  const b=$('progBody'); b.style.animation='none'; void b.offsetWidth; b.style.animation='rise .3s ease both';
+}
 function slotDate(dayDate,t){ return new Date(`${dayDate}T${t}:00`); }
 
 function statusOf(now){
@@ -1201,9 +1261,33 @@ function renderProgram(){
   }
 
   const svgCal='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M12 13v4M10 15h4"/></svg>';
-  let html='';
-  days.forEach((d,di)=>{
-    html+=`<div class="day-head">${d.label}</div><div class="timeline">`;
+
+  // jour affiché : celui d'aujourd'hui si le forum est en cours, sinon Jour 1
+  if(progDay===null){
+    const today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const idx=days.findIndex(d=>d.date===today);
+    progDay=idx>=0?idx:0;
+  }
+
+  // onglets Jour 1 / Jour 2 (+ swipe géré par startProgram)
+  let html='<div class="day-tabs">'+days.map((d,i)=>{
+    const short=d.label.split('·')[0].trim();
+    return `<button class="day-tab ${i===progDay?'on':''}" onclick="setProgDay(${i})">${short}</button>`;
+  }).join('')+'</div>';
+  const sub=(days[progDay].label.split('·')[1]||'').trim();
+  html+=sub?`<div class="day-sub">${sub}</div>`:'';
+  html+='<div class="swipe-hint">← GLISSE POUR CHANGER DE JOUR →</div>';
+  html+=`<div class="legend">
+    <span class="lg"><i style="background:var(--cat-cer)"></i>Cérémonie</span>
+    <span class="lg"><i style="background:var(--cat-panel)"></i>Panel</span>
+    <span class="lg"><i style="background:var(--cat-conf)"></i>Conférence</span>
+    <span class="lg"><i style="background:var(--cat-ws)"></i>Workshop</span>
+    <span class="lg"><i style="background:var(--cat-brk)"></i>Pause</span>
+  </div>`;
+
+  [days[progDay]].forEach(d=>{
+    const di=progDay;
+    html+=`<div class="timeline">`;
     d.sessions.forEach((s,si)=>{
       const key=di+'-'+si;
       let cls=map[key]==='now'?'now':map[key]==='past'?'past':(key===nextKey?'next':'');
@@ -1217,7 +1301,7 @@ function renderProgram(){
       const mod=s.mod?`<div class="slot-mod">Modérateur : <b>${s.mod}</b></div>`:'';
       const desc=s.desc?`<div class="slot-desc">${s.desc}</div>`:'';
       const ics=s.brk?'':`<button class="slot-ics" onclick="exportSession(${di},${si})">${svgCal} Ajouter au calendrier</button>`;
-      html+=`<div class="slot ${s.brk?'brk':''} ${cls}">
+      html+=`<div class="slot ${s.brk?'brk':''} cat-${catOf(s)} ${cls}">
         <div class="st-time">${fmtHM(s.start)} – ${fmtHM(s.end)}${label?`<span class="st-status">${label}</span>`:''}</div>
         <div class="slot-card">
           ${tags.length?`<div class="slot-tags">${tags.join('')}</div>`:''}
@@ -1233,6 +1317,16 @@ function startProgram(){
   renderProgram();
   clearInterval(progTimer);
   progTimer=setInterval(renderProgram,60000); // rafraîchit le statut chaque minute
+  // swipe gauche/droite pour changer de jour
+  if(!window._progSwipe){
+    window._progSwipe=true;
+    const el=$('v-prog'); let sx=0,sy=0;
+    el.addEventListener('touchstart',e=>{ sx=e.touches[0].clientX; sy=e.touches[0].clientY; },{passive:true});
+    el.addEventListener('touchend',e=>{
+      const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
+      if(Math.abs(dx)>60 && Math.abs(dx)>1.6*Math.abs(dy)) setProgDay(progDay+(dx<0?1:-1));
+    },{passive:true});
+  }
 }
 function stopProgram(){ clearInterval(progTimer); progTimer=null; }
 
