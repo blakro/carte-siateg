@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A1019">
+<title>Carte — SIATeG</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carte SIATeG">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" type="image/png" href="./icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+:root{
+  --ground:#0A1019;
+  --ground-2:#101c2e;
+  --surface:#141f31;
+  --surface-2:#1b2942;
+  --accent:#FF4C01;
+  --accent-soft:#FF8A5B;
+  --paper:#F4F2EA;
+  --paper-ink:#141a24;
+  --ink:#E9EEF6;
+  --muted:#7F8FA6;
+  --line:rgba(127,143,166,.18);
+  --grid:rgba(255,76,1,.10);
+  --ok:#4ADE80;
+  --danger:#F87171;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--ground-2), var(--ground) 60%);
+  min-height:100dvh;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* faint survey grid */
+.grid-bg{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:46px 46px;
+  mask-image:radial-gradient(130% 100% at 50% 0%, #000 40%, transparent 92%);
+}
+
+.app{position:relative;z-index:1;max-width:460px;margin:0 auto;
+  min-height:100dvh;display:flex;flex-direction:column;
+  padding:0 18px calc(86px + env(safe-area-inset-bottom));}
+
+/* header */
+header{padding:22px 2px 12px;}
+.brand{display:flex;align-items:baseline;gap:9px;}
+.brand b{font-family:'Space Grotesk';font-weight:700;font-size:20px;letter-spacing:-.02em;}
+.brand span{color:var(--accent);font-family:'Space Grotesk';font-weight:700;}
+.coords{font-family:'Space Mono';font-size:11px;color:var(--muted);
+  margin-top:5px;display:flex;align-items:center;gap:7px;letter-spacing:.02em;}
+.ping{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 0 rgba(255,76,1,.6);animation:ping 2.4s ease-out infinite;}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,76,1,.5)}70%{box-shadow:0 0 0 7px rgba(255,76,1,0)}100%{box-shadow:0 0 0 0 rgba(255,76,1,0)}}
+
+/* views */
+.view{display:none;flex:1;animation:rise .35s ease both;}
+.view.active{display:flex;flex-direction:column;}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.eyebrow{font-family:'Space Mono';font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);margin:6px 2px 12px;}
+
+/* the business card */
+.card{background:var(--paper);color:var(--paper-ink);border-radius:20px;
+  padding:22px 20px 24px;box-shadow:0 18px 50px -20px rgba(0,0,0,.7);
+  position:relative;overflow:hidden;}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-soft));}
+.card-name{font-family:'Space Grotesk';font-weight:700;font-size:25px;
+  letter-spacing:-.02em;line-height:1.05;margin:4px 0 2px;}
+.card-role{font-size:13.5px;color:#4a5568;font-weight:500;}
+.card-org{font-size:12.5px;color:#6b7688;margin-top:1px;}
+
+.details{margin:16px 0 4px;border-top:1px dashed #d5d0c2;padding-top:14px;
+  display:flex;flex-direction:column;gap:9px;}
+.det{display:flex;align-items:center;gap:10px;font-family:'Space Mono';
+  font-size:12.5px;color:#333b49;word-break:break-all;}
+.det svg{flex:none;color:var(--accent);}
+
+/* QR reticle */
+.reticle{margin:18px auto 4px;width:206px;height:206px;position:relative;
+  display:flex;align-items:center;justify-content:center;padding:14px;}
+.reticle::before,.reticle::after{content:"";position:absolute;width:22px;height:22px;
+  border:2.5px solid var(--accent);}
+.reticle::before{top:0;left:0;border-right:0;border-bottom:0;}
+.reticle::after{bottom:0;right:0;border-left:0;border-top:0;}
+.reticle i{position:absolute;width:22px;height:22px;border:2.5px solid var(--accent);}
+.reticle i.tr{top:0;right:0;border-left:0;border-bottom:0;}
+.reticle i.bl{bottom:0;left:0;border-right:0;border-top:0;}
+#qr img,#qr canvas{display:block;width:100%!important;height:100%!important;}
+.qr-hint{text-align:center;font-family:'Space Mono';font-size:10.5px;
+  color:#8a8574;letter-spacing:.04em;margin-top:8px;}
+
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:18px;
+  padding:34px 22px;text-align:center;color:var(--muted);}
+.empty b{color:var(--ink);display:block;font-family:'Space Grotesk';font-size:16px;margin-bottom:6px;}
+
+/* buttons */
+.row{display:flex;gap:10px;margin-top:14px;}
+.btn{flex:1;border:0;border-radius:13px;padding:14px;font-family:'Space Grotesk';
+  font-weight:600;font-size:14.5px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:8px;transition:transform .12s,filter .12s;}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--accent);color:#fff;}
+.btn.primary:hover{filter:brightness(1.08);}
+.btn.ghost{background:var(--surface-2);color:var(--ink);}
+.btn svg{flex:none;}
+
+/* form */
+.form{display:flex;flex-direction:column;gap:13px;margin-top:4px;}
+.field label{display:block;font-family:'Space Mono';font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.field input{width:100%;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:13px 14px;color:var(--ink);font-size:15px;
+  font-family:'Inter';outline:none;transition:border-color .15s;}
+.field input:focus{border-color:var(--accent);}
+.field input::placeholder{color:#546074;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+
+/* scanner */
+.scanwrap{position:relative;border-radius:20px;overflow:hidden;background:#000;
+  aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);}
+.scanwrap video{width:100%;height:100%;object-fit:cover;}
+.scan-overlay{position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 0 3px rgba(255,76,1,.35);}
+.scan-frame{position:absolute;top:18%;left:18%;right:18%;bottom:18%;}
+.scan-frame i{position:absolute;width:26px;height:26px;border:3px solid var(--accent);}
+.scan-frame .c1{top:0;left:0;border-right:0;border-bottom:0;}
+.scan-frame .c2{top:0;right:0;border-left:0;border-bottom:0;}
+.scan-frame .c3{bottom:0;left:0;border-right:0;border-top:0;}
+.scan-frame .c4{bottom:0;right:0;border-left:0;border-top:0;}
+.scanline{position:absolute;left:18%;right:18%;height:2px;background:var(--accent);
+  box-shadow:0 0 10px var(--accent);top:18%;animation:sweep 2.6s ease-in-out infinite;}
+@keyframes sweep{0%,100%{top:18%}50%{top:82%}}
+.scan-msg{text-align:center;color:var(--muted);font-size:13px;padding:16px 8px;}
+.scan-msg.err{color:var(--danger);}
+
+/* contacts */
+.contact{background:var(--surface);border:1px solid var(--line);border-radius:15px;
+  padding:14px 15px;margin-bottom:11px;display:flex;gap:13px;align-items:flex-start;}
+.avatar{width:44px;height:44px;flex:none;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-soft));
+  display:flex;align-items:center;justify-content:center;color:#fff;
+  font-family:'Space Grotesk';font-weight:700;font-size:17px;}
+.contact .info{flex:1;min-width:0;}
+.contact .cn{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;}
+.contact .cr{font-size:12.5px;color:var(--muted);margin-top:1px;}
+.contact .cmeta{font-family:'Space Mono';font-size:11px;color:#63718a;
+  margin-top:4px;word-break:break-all;}
+.cactions{display:flex;gap:8px;margin-top:11px;}
+.mini{border:0;background:var(--surface-2);color:var(--ink);border-radius:9px;
+  padding:8px 11px;font-size:12px;font-weight:600;font-family:'Space Grotesk';
+  cursor:pointer;display:flex;align-items:center;gap:6px;}
+.mini:active{transform:scale(.95);}
+.mini.warn{color:var(--danger);}
+.count{font-family:'Space Mono';font-size:11px;color:var(--muted);
+  margin-left:auto;align-self:center;}
+.section-head{display:flex;align-items:center;margin:6px 2px 14px;}
+.section-head .eyebrow{margin:0;}
+
+/* bottom nav */
+nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
+  background:rgba(10,16,25,.86);backdrop-filter:blur(16px);
+  border-top:1px solid var(--line);
+  padding:8px 0 calc(8px + env(safe-area-inset-bottom));}
+.nav-inner{max-width:460px;margin:0 auto;display:flex;}
+.tab{flex:1;background:0;border:0;color:var(--muted);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;
+  font-family:'Space Grotesk';font-weight:600;font-size:11px;transition:color .15s;}
+.tab svg{transition:transform .15s;}
+.tab.active{color:var(--accent);}
+.tab.active svg{transform:translateY(-1px);}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));
+  transform:translateX(-50%) translateY(20px);z-index:20;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--ink);
+  padding:12px 18px;border-radius:12px;font-size:13.5px;font-weight:500;
+  opacity:0;pointer-events:none;transition:.3s;box-shadow:0 10px 30px -10px #000;
+  display:flex;align-items:center;gap:9px;max-width:90%;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;}
+
+.hidden{display:none!important;}
+
+/* header install */
+.head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.install-chip{flex:none;display:inline-flex;align-items:center;gap:6px;
+  background:var(--accent);color:#fff;border:0;border-radius:11px;
+  padding:9px 13px;font-family:'Space Grotesk';font-weight:600;font-size:13px;
+  cursor:pointer;margin-top:2px;transition:transform .12s,filter .12s;}
+.install-chip:active{transform:scale(.95);}
+.install-chip:hover{filter:brightness(1.08);}
+
+/* iOS install steps */
+.ios-step{display:flex;gap:13px;align-items:flex-start;margin-bottom:14px;}
+.ios-num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);
+  color:#fff;font-family:'Space Grotesk';font-weight:700;font-size:13px;
+  display:flex;align-items:center;justify-content:center;}
+.ios-step p{margin:2px 0 0;font-size:14px;line-height:1.5;color:var(--ink);}
+.ios-step b{color:var(--accent-soft);}
+
+/* OCR separator + note */
+.ocr-sep{display:flex;align-items:center;gap:12px;margin:18px 2px 12px;
+  color:var(--muted);font-family:'Space Mono';font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;}
+.ocr-sep::before,.ocr-sep::after{content:"";flex:1;height:1px;background:var(--line);}
+.ocr-note{text-align:center;font-family:'Space Mono';font-size:10.5px;
+  color:#5f6d84;margin-top:10px;letter-spacing:.02em;}
+
+/* OCR overlay */
+.ocr-overlay{position:fixed;inset:0;z-index:30;background:rgba(6,11,18,.9);
+  backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:26px;}
+.ocr-overlay.show{display:flex;}
+.ocr-box{background:var(--surface);border:1px solid var(--line);border-radius:20px;
+  padding:26px 22px;width:100%;max-width:340px;text-align:center;}
+.ocr-scanner{width:72px;height:72px;margin:0 auto 18px;border-radius:16px;
+  background:var(--surface-2);position:relative;overflow:hidden;
+  border:1px solid var(--line);}
+.ocr-scanner::before{content:"";position:absolute;inset:14px;border-radius:6px;
+  background:repeating-linear-gradient(0deg,var(--muted) 0 2px,transparent 2px 6px);opacity:.25;}
+.ocr-line{position:absolute;left:0;right:0;height:3px;background:var(--accent);
+  box-shadow:0 0 12px var(--accent);top:0;animation:ocrsweep 1.4s ease-in-out infinite;}
+@keyframes ocrsweep{0%,100%{top:8%}50%{top:88%}}
+.ocr-title{font-family:'Space Grotesk';font-weight:600;font-size:17px;}
+.ocr-bar{height:6px;background:var(--surface-2);border-radius:99px;margin:16px 0 8px;overflow:hidden;}
+.ocr-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-soft));
+  border-radius:99px;transition:width .3s;}
+.ocr-pct{font-family:'Space Mono';font-size:12px;color:var(--accent-soft);}
+.ocr-sub{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
+
+/* review modal (bottom sheet) */
+.modal{position:fixed;inset:0;z-index:25;background:rgba(6,11,18,.72);
+  display:none;align-items:flex-end;justify-content:center;
+  backdrop-filter:blur(4px);}
+.modal.show{display:flex;animation:fade .25s ease;}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{background:var(--ground-2);border:1px solid var(--line);border-bottom:0;
+  border-radius:24px 24px 0 0;width:100%;max-width:460px;padding:12px 18px 26px;
+  max-height:92dvh;overflow-y:auto;animation:sheetup .3s cubic-bezier(.2,.8,.2,1);}
+@keyframes sheetup{from{transform:translateY(30px)}to{transform:none}}
+.sheet-grip{width:38px;height:4px;border-radius:99px;background:var(--line);
+  margin:2px auto 16px;}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.card-thumb{width:52px;height:34px;object-fit:cover;border-radius:7px;
+  border:1px solid var(--line);}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="app">
+
+  <header>
+    <div class="head-row">
+      <div>
+        <div class="brand"><b>SIA<span>TeG</span></b> <span style="color:var(--muted);font-family:'Space Mono';font-size:11px;font-weight:400;letter-spacing:.05em;">/ carte</span></div>
+        <div class="coords"><span class="ping"></span>13.5116° N · 2.1254° E — Niamey · 23–24 JUL 2026</div>
+      </div>
+      <button id="installBtn" class="install-chip" onclick="doInstall()" hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Installer
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== CARTE ===== -->
+  <section class="view active" id="v-card">
+    <div class="eyebrow">Ma carte de visite</div>
+
+    <div id="cardEmpty" class="empty">
+      <b>Complète ton profil</b>
+      Renseigne ton nom pour générer ta carte et ton QR code.
+      <div class="row"><button class="btn primary" onclick="go('edit')">Créer ma carte</button></div>
+    </div>
+
+    <div id="cardFace" class="card hidden">
+      <div class="card-name" id="dName">—</div>
+      <div class="card-role" id="dRole"></div>
+      <div class="card-org" id="dOrg"></div>
+      <div class="details" id="dDetails"></div>
+
+      <div class="reticle"><i class="tr"></i><i class="bl"></i>
+        <div id="qr"></div>
+      </div>
+      <div class="qr-hint">SCANNE-MOI AVEC TON APPAREIL PHOTO</div>
+    </div>
+
+    <div class="row" id="cardActions" style="display:none">
+      <button class="btn primary" onclick="shareCard()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+        Partager</button>
+      <button class="btn ghost" onclick="go('edit')">Modifier</button>
+    </div>
+  </section>
+
+  <!-- ===== EDITION ===== -->
+  <section class="view" id="v-edit">
+    <div class="eyebrow">Mon profil</div>
+    <div class="form">
+      <div class="grid2">
+        <div class="field"><label>Prénom</label><input id="f-first" placeholder="Aïcha"></div>
+        <div class="field"><label>Nom</label><input id="f-last" placeholder="Oumarou"></div>
+      </div>
+      <div class="field"><label>Rôle / Titre</label><input id="f-role" placeholder="Data Scientist"></div>
+      <div class="field"><label>Organisation</label><input id="f-org" placeholder="Université Abdou Moumouni"></div>
+      <div class="field"><label>Téléphone</label><input id="f-phone" type="tel" placeholder="+227 90 00 00 00"></div>
+      <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="aicha@email.com"></div>
+      <div class="field"><label>LinkedIn (lien du profil)</label><input id="f-linkedin" placeholder="linkedin.com/in/aicha"></div>
+      <div class="row">
+        <button class="btn ghost" onclick="go('card')">Annuler</button>
+        <button class="btn primary" onclick="saveProfile()">Enregistrer</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SCANNER ===== -->
+  <section class="view" id="v-scan">
+    <div class="eyebrow">Scanner un contact</div>
+    <div class="scanwrap">
+      <video id="video" playsinline muted></video>
+      <div class="scan-overlay"></div>
+      <div class="scan-frame"><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i></div>
+      <div class="scanline"></div>
+    </div>
+    <div class="scan-msg" id="scanMsg">Vise le QR d'un autre participant.</div>
+    <div class="row">
+      <label class="btn ghost" style="cursor:pointer">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+        Photographier un QR
+        <input type="file" accept="image/*" capture="environment" onchange="decodeFile(event)" hidden>
+      </label>
+    </div>
+
+    <div class="ocr-sep"><span>ou une carte papier</span></div>
+    <div class="row">
+      <label class="btn primary" style="cursor:pointer">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1-4h16l1 4"/><rect x="2" y="9" width="20" height="11" rx="2"/><path d="M7 13h6M7 16h4"/><circle cx="17" cy="14.5" r="1.5"/></svg>
+        Scanner une carte de visite
+        <input type="file" accept="image/*" capture="environment" onchange="scanPaperCard(event)" hidden>
+      </label>
+    </div>
+    <div class="ocr-note">Lecture par IA embarquée — la photo ne quitte jamais ton téléphone.</div>
+    <canvas id="scanCanvas" hidden></canvas>
+  </section>
+
+  <!-- ===== CONTACTS ===== -->
+  <section class="view" id="v-list">
+    <div class="section-head">
+      <div class="eyebrow">Contacts du forum</div>
+      <span class="count" id="cCount">0</span>
+    </div>
+    <div id="contactList"></div>
+    <div id="listEmpty" class="empty">
+      <b>Aucun contact pour l'instant</b>
+      Va dans Scanner pour ajouter les personnes que tu rencontres.
+    </div>
+    <div class="row" id="exportRow" style="display:none">
+      <button class="btn ghost" onclick="exportAll()">Exporter tout (.vcf)</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- nav -->
+<nav>
+  <div class="nav-inner">
+    <button class="tab active" data-tab="card" onclick="go('card')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M13 9h5M13 13h5M6 16h12"/></svg>
+      Ma carte</button>
+    <button class="tab" data-tab="scan" onclick="go('scan')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2"/><path d="M4 12h16"/></svg>
+      Scanner</button>
+    <button class="tab" data-tab="list" onclick="go('list')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Contacts</button>
+  </div>
+</nav>
+
+<!-- OCR progress -->
+<div class="ocr-overlay" id="ocrOverlay">
+  <div class="ocr-box">
+    <div class="ocr-scanner"><div class="ocr-line"></div></div>
+    <div class="ocr-title" id="ocrTitle">Lecture de la carte…</div>
+    <div class="ocr-bar"><div class="ocr-fill" id="ocrFill"></div></div>
+    <div class="ocr-pct" id="ocrPct">Initialisation du moteur…</div>
+    <div class="ocr-sub">Premier scan un peu plus long : le moteur se télécharge une seule fois.</div>
+  </div>
+</div>
+
+<!-- review modal -->
+<div class="modal" id="review">
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="eyebrow" style="margin:0">Vérifie le contact</div>
+      <img id="cardThumb" class="card-thumb" alt="">
+    </div>
+    <div class="form">
+      <div class="grid2">
+        <div class="field"><label>Prénom</label><input id="r-first"></div>
+        <div class="field"><label>Nom</label><input id="r-last"></div>
+      </div>
+      <div class="field"><label>Rôle / Titre</label><input id="r-role"></div>
+      <div class="field"><label>Organisation</label><input id="r-org"></div>
+      <div class="field"><label>Téléphone</label><input id="r-phone" type="tel"></div>
+      <div class="field"><label>Email</label><input id="r-email" type="email"></div>
+      <div class="field"><label>LinkedIn / Site</label><input id="r-linkedin"></div>
+      <div class="row">
+        <button class="btn ghost" onclick="closeReview()">Annuler</button>
+        <button class="btn primary" onclick="confirmReview()">Ajouter le contact</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- iOS install instructions -->
+<div class="modal" id="iosHelp">
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="eyebrow" style="margin:0 0 16px">Installer sur iPhone</div>
+    <div class="ios-step"><span class="ios-num">1</span><p>Touche le bouton <b>Partager</b> en bas de Safari (le carré avec une flèche vers le haut).</p></div>
+    <div class="ios-step"><span class="ios-num">2</span><p>Fais défiler et choisis <b>« Sur l'écran d'accueil »</b>.</p></div>
+    <div class="ios-step"><span class="ios-num">3</span><p>Touche <b>Ajouter</b>. L'app apparaît sur ton écran d'accueil comme une vraie application.</p></div>
+    <div class="row"><button class="btn primary" onclick="$('iosHelp').classList.remove('show')">Compris</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
+
+<script>
+/* ============ CONFIG ÉVÉNEMENT (change ceci pour un autre forum) ============ */
+const EVENT = {
+  name: "Rencontré à SIATeG 2026 — Niamey",
+  tag: "SIATeG 2026"
+};
+/* =========================================================================== */
+
+/* ---- stockage persistant (compatible artifact + fallback mémoire) ---- */
+const mem = {};
+const store = {
+  async get(k){ try{ const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; }catch(e){ return (k in mem)? mem[k] : null; } },
+  async set(k,v){ mem[k]=v; try{ await window.storage.set(k, JSON.stringify(v)); }catch(e){} }
+};
+
+let profile = null;
+let contacts = [];
+
+/* ---- helpers ---- */
+const $ = id => document.getElementById(id);
+function toast(msg){ $('toastMsg').textContent = msg; $('toast').classList.add('show');
+  clearTimeout(window._tt); window._tt=setTimeout(()=>$('toast').classList.remove('show'),2200); }
+function normUrl(u){ if(!u) return ''; u=u.trim(); return /^https?:\/\//i.test(u)?u:'https://'+u; }
+function escapeVcf(s){ return (s||'').replace(/([;,\\])/g,'\\$1').replace(/\n/g,'\\n'); }
+function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+
+/* ---- vCard ---- */
+function buildVCard(p){
+  const fn = `${p.first||''} ${p.last||''}`.trim();
+  const L = ['BEGIN:VCARD','VERSION:3.0',
+    `N:${escapeVcf(p.last)};${escapeVcf(p.first)};;;`,
+    `FN:${escapeVcf(fn)}`];
+  if(p.org)   L.push(`ORG:${escapeVcf(p.org)}`);
+  if(p.role)  L.push(`TITLE:${escapeVcf(p.role)}`);
+  if(p.phone) L.push(`TEL;TYPE=CELL:${p.phone.trim()}`);
+  if(p.email) L.push(`EMAIL;TYPE=INTERNET:${p.email.trim()}`);
+  if(p.linkedin) L.push(`URL:${normUrl(p.linkedin)}`);
+  L.push(`NOTE:${escapeVcf(EVENT.name)}`);
+  L.push('END:VCARD');
+  return L.join('\r\n');
+}
+
+/* ---- navigation ---- */
+let currentView='card';
+function go(view){
+  currentView=view;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  const map={card:'v-card',edit:'v-edit',scan:'v-scan',list:'v-list'};
+  $(map[view]).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===view));
+  if(view==='edit') fillForm();
+  if(view==='list') renderContacts();
+  if(view==='scan') startScanner(); else stopScanner();
+}
+
+/* ---- profil ---- */
+function fillForm(){
+  const p=profile||{};
+  $('f-first').value=p.first||''; $('f-last').value=p.last||'';
+  $('f-role').value=p.role||''; $('f-org').value=p.org||'';
+  $('f-phone').value=p.phone||''; $('f-email').value=p.email||'';
+  $('f-linkedin').value=p.linkedin||'';
+}
+async function saveProfile(){
+  const p={ first:$('f-first').value.trim(), last:$('f-last').value.trim(),
+    role:$('f-role').value.trim(), org:$('f-org').value.trim(),
+    phone:$('f-phone').value.trim(), email:$('f-email').value.trim(),
+    linkedin:$('f-linkedin').value.trim() };
+  if(!p.first && !p.last){ toast('Ajoute au moins ton nom'); return; }
+  profile=p; await store.set('profile',p);
+  renderCard(); go('card'); toast('Carte enregistrée');
+}
+
+function renderCard(){
+  if(!profile || (!profile.first && !profile.last)){
+    $('cardEmpty').classList.remove('hidden');
+    $('cardFace').classList.add('hidden');
+    $('cardActions').style.display='none';
+    return;
+  }
+  $('cardEmpty').classList.add('hidden');
+  $('cardFace').classList.remove('hidden');
+  $('cardActions').style.display='flex';
+
+  const fn=`${profile.first||''} ${profile.last||''}`.trim();
+  $('dName').textContent=fn;
+  $('dRole').textContent=profile.role||'';
+  $('dOrg').textContent=profile.org||'';
+
+  const ic={
+    phone:'<path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012 4.2 2 2 0 014 2h3a2 2 0 012 1.7c.1.9.3 1.8.6 2.6a2 2 0 01-.5 2.1L8 9.6a16 16 0 006 6l1.2-1.1a2 2 0 012.1-.5c.8.3 1.7.5 2.6.6a2 2 0 011.7 2z"/>',
+    email:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
+    link:'<path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>'
+  };
+  const rows=[];
+  if(profile.phone) rows.push(det(ic.phone,profile.phone));
+  if(profile.email) rows.push(det(ic.email,profile.email));
+  if(profile.linkedin) rows.push(det(ic.link,profile.linkedin.replace(/^https?:\/\//,'')));
+  $('dDetails').innerHTML=rows.join('');
+  $('dDetails').style.display = rows.length?'flex':'none';
+
+  const box=$('qr'); box.innerHTML='';
+  new QRCode(box,{ text:buildVCard(profile), width:178, height:178,
+    colorDark:'#141a24', colorLight:'#F4F2EA', correctLevel:QRCode.CorrectLevel.M });
+}
+function det(icon,txt){
+  return `<div class="det"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>${txt}</div>`;
+}
+
+/* ---- partage ---- */
+async function shareCard(){
+  const vcf=buildVCard(profile);
+  const fn=`${profile.first||'contact'}.vcf`;
+  const file=new File([vcf],fn,{type:'text/vcard'});
+  try{
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'Ma carte SIATeG'});
+      return;
+    }
+  }catch(e){ if(e && e.name==='AbortError') return; }
+  // fallback : téléchargement du .vcf
+  downloadBlob(vcf,fn,'text/vcard');
+  toast('Carte .vcf téléchargée');
+}
+function downloadBlob(content,filename,type){
+  const b=new Blob([content],{type}); const u=URL.createObjectURL(b);
+  const a=document.createElement('a'); a.href=u; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),1500);
+}
+
+/* ---- scanner ---- */
+let stream=null, scanning=false, rafId=null;
+async function startScanner(){
+  const msg=$('scanMsg'); msg.className='scan-msg'; msg.textContent='Ouverture de la caméra…';
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const v=$('video'); v.srcObject=stream; await v.play();
+    scanning=true; msg.textContent='Vise le QR d\'un autre participant.';
+    tick();
+  }catch(e){
+    msg.className='scan-msg err';
+    msg.textContent='Caméra indisponible ici. Utilise « Photographier un QR » ci-dessous.';
+  }
+}
+function stopScanner(){
+  scanning=false; if(rafId) cancelAnimationFrame(rafId);
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  const v=$('video'); if(v) v.srcObject=null;
+}
+function tick(){
+  if(!scanning) return;
+  const v=$('video'), c=$('scanCanvas');
+  if(v.readyState===v.HAVE_ENOUGH_DATA){
+    c.width=v.videoWidth; c.height=v.videoHeight;
+    const ctx=c.getContext('2d'); ctx.drawImage(v,0,0,c.width,c.height);
+    const img=ctx.getImageData(0,0,c.width,c.height);
+    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+    if(code && code.data){ handleScan(code.data); return; }
+  }
+  rafId=requestAnimationFrame(tick);
+}
+function decodeFile(ev){
+  const file=ev.target.files[0]; if(!file) return;
+  const img=new Image();
+  img.onload=()=>{
+    const c=$('scanCanvas'); c.width=img.width; c.height=img.height;
+    const ctx=c.getContext('2d'); ctx.drawImage(img,0,0);
+    const d=ctx.getImageData(0,0,c.width,c.height);
+    const code=jsQR(d.data,d.width,d.height,{inversionAttempts:'attemptBoth'});
+    if(code && code.data) handleScan(code.data);
+    else toast('Aucun QR détecté sur la photo');
+  };
+  img.src=URL.createObjectURL(file);
+  ev.target.value='';
+}
+
+/* ---- OCR carte papier (Tesseract, 100% local) ---- */
+let lastCardUrl='';
+async function scanPaperCard(ev){
+  const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
+  if(typeof Tesseract==='undefined'){ toast('Moteur OCR non chargé — réessaie'); return; }
+  stopScanner();
+  if(lastCardUrl) URL.revokeObjectURL(lastCardUrl);
+  lastCardUrl=URL.createObjectURL(file);
+
+  const ov=$('ocrOverlay'); ov.classList.add('show');
+  $('ocrFill').style.width='0%'; $('ocrPct').textContent='Initialisation du moteur…';
+  $('ocrTitle').textContent='Lecture de la carte…';
+
+  try{
+    const res=await Tesseract.recognize(lastCardUrl,'fra+eng',{
+      logger:m=>{
+        if(m.status==='recognizing text'){
+          const p=Math.round(m.progress*100);
+          $('ocrFill').style.width=p+'%'; $('ocrPct').textContent=p+' %';
+        } else if(m.status){
+          $('ocrPct').textContent='Préparation…';
+        }
+      }
+    });
+    ov.classList.remove('show');
+    const parsed=parseCardText(res.data.text||'');
+    openReview(parsed, lastCardUrl);
+  }catch(e){
+    ov.classList.remove('show');
+    // échec moteur : on ouvre quand même la fiche vide pour saisie manuelle
+    openReview({}, lastCardUrl);
+    toast('Lecture auto indisponible — complète à la main');
+  }
+}
+
+function parseCardText(text){
+  const lines=text.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const emailRe=/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
+  const linkedinRe=/(linkedin\.com\/[^\s]+)/i;
+  const urlRe=/((https?:\/\/)?(www\.)?[a-z0-9-]+\.(com|org|net|io|ne|fr|africa|co|tech|ai)(\/[^\s]*)?)/i;
+  const phoneRe=/(\+?\(?\d[\d\s().\-]{6,}\d)/;
+  const orgKw=/(sarl|s\.a|inc|ltd|llc|universit|institut|agence|agency|minist|company|technolog|solutions|group|groupe|consult|center|centre|labo|startup|hub|bank|banque|telecom)/i;
+  const roleKw=/(manager|director|directeur|directrice|ingénieur|ingenieur|engineer|développeur|developpeur|developer|data|scientist|analyst|analyste|chef|head|lead|founder|fondateur|ceo|cto|coo|responsable|consultant|professor|professeur|doctor|docteur|phd|étudiant|etudiant|student|chercheur|researcher|designer|expert|officer|coordinat)/i;
+
+  let email='',phone='',linkedin='',website='';
+  for(const l of lines){
+    if(!email){ const m=l.match(emailRe); if(m) email=m[0]; }
+    if(!linkedin){ const m=l.match(linkedinRe); if(m) linkedin=m[1].replace(/[),.]+$/,''); }
+    if(!phone){ const m=l.match(phoneRe); if(m && m[1].replace(/\D/g,'').length>=7) phone=m[1].trim(); }
+  }
+  if(!linkedin){ for(const l of lines){ const m=l.match(urlRe);
+    if(m && !emailRe.test(m[0])){ website=m[0]; break; } } }
+
+  // lignes "propres" candidates pour nom / rôle / organisation
+  const clean=lines.filter(l=>!emailRe.test(l)&&!linkedinRe.test(l)&&!phoneRe.test(l)&&!urlRe.test(l));
+  let role='',org='',nameLine='';
+  for(const l of clean){ if(!role && roleKw.test(l)) role=l; }
+  for(const l of clean){ if(!org && orgKw.test(l) && l!==role) org=l; }
+  for(const l of clean){
+    const letters=l.replace(/[^a-zàâäéèêëïîôöùûüç]/gi,'').length;
+    const words=l.split(/\s+/).length;
+    if(l!==role && l!==org && letters>=3 && words<=4 && /[a-zàâäéèêëïîôöùûüç]/i.test(l)){ nameLine=l; break; }
+  }
+  if(!org && email){ const dom=email.split('@')[1].split('.')[0];
+    if(dom && dom.length<=6) org=dom.toUpperCase(); }
+
+  const parts=(nameLine||'').split(/\s+/);
+  const first=parts.slice(0,-1).join(' ')||parts[0]||'';
+  const last=parts.length>1?parts[parts.length-1]:'';
+  return { first, last, role, org, phone, email,
+           linkedin: linkedin?normUrl(linkedin):(website?normUrl(website):'') };
+}
+
+/* ---- modale de révision ---- */
+function openReview(c,thumb){
+  $('r-first').value=c.first||''; $('r-last').value=c.last||'';
+  $('r-role').value=c.role||''; $('r-org').value=c.org||'';
+  $('r-phone').value=c.phone||''; $('r-email').value=c.email||'';
+  $('r-linkedin').value=c.linkedin||'';
+  const t=$('cardThumb'); if(thumb){ t.src=thumb; t.style.display='block'; } else t.style.display='none';
+  $('review').classList.add('show');
+}
+function closeReview(){ $('review').classList.remove('show'); }
+async function confirmReview(){
+  const first=$('r-first').value.trim(), last=$('r-last').value.trim();
+  if(!first && !last){ toast('Ajoute au moins un nom'); return; }
+  const c={ id:Date.now(), tag:EVENT.tag, first, last,
+    name:`${first} ${last}`.trim(),
+    role:$('r-role').value.trim(), org:$('r-org').value.trim(),
+    phone:$('r-phone').value.trim(), email:$('r-email').value.trim(),
+    linkedin:$('r-linkedin').value.trim() };
+  c.raw=buildVCard(c);
+  contacts.unshift(c); await store.set('contacts',contacts);
+  closeReview(); toast('Contact ajouté : '+c.name); go('list');
+}
+
+function parseVCard(txt){
+  const g=re=>{ const m=txt.match(re); return m?m[1].trim():''; };
+  let first='',last='';
+  const n=g(/\nN:([^\r\n]+)/i);
+  if(n){ const parts=n.split(';'); last=(parts[0]||'').replace(/\\(.)/g,'$1'); first=(parts[1]||'').replace(/\\(.)/g,'$1'); }
+  const fn=g(/\nFN:([^\r\n]+)/i).replace(/\\(.)/g,'$1');
+  return {
+    first, last: last,
+    name: fn || `${first} ${last}`.trim(),
+    role: g(/\nTITLE:([^\r\n]+)/i).replace(/\\(.)/g,'$1'),
+    org: g(/\nORG:([^\r\n]+)/i).replace(/\\(.)/g,'$1'),
+    phone: g(/\nTEL[^:]*:([^\r\n]+)/i),
+    email: g(/\nEMAIL[^:]*:([^\r\n]+)/i),
+    linkedin: g(/\nURL:([^\r\n]+)/i),
+    raw: txt
+  };
+}
+async function handleScan(data){
+  stopScanner();
+  let c;
+  if(/BEGIN:VCARD/i.test(data)){
+    c=parseVCard(data);
+    if(!c.name) c.name='Contact';
+  } else if(/^https?:\/\//i.test(data) || /linkedin\.com/i.test(data)){
+    const url=normUrl(data);
+    let name='Contact';
+    const m=url.match(/linkedin\.com\/in\/([^/?#]+)/i);
+    if(m) name=decodeURIComponent(m[1]).replace(/-/g,' ').replace(/\b\w/g,x=>x.toUpperCase());
+    c={ name, first:name, last:'', role:'', org:'',
+        phone:'', email:'', linkedin:url, raw:buildVCard({first:name,linkedin:url}) };
+  } else {
+    c={ name:'Note scannée', first:'Note', last:'', role:'', org:'',
+        phone:'', email:'', linkedin:'', note:data, raw:data };
+  }
+  c.id=Date.now(); c.tag=EVENT.tag;
+  contacts.unshift(c); await store.set('contacts',contacts);
+  toast('Contact ajouté : '+c.name);
+  go('list');
+}
+
+/* ---- contacts ---- */
+function renderContacts(){
+  const list=$('contactList');
+  $('cCount').textContent=contacts.length;
+  if(!contacts.length){
+    list.innerHTML=''; $('listEmpty').style.display='block';
+    $('exportRow').style.display='none'; return;
+  }
+  $('listEmpty').style.display='none';
+  $('exportRow').style.display='flex';
+  list.innerHTML=contacts.map(c=>{
+    const meta=[c.phone,c.email,(c.linkedin||'').replace(/^https?:\/\//,'')].filter(Boolean).join(' · ');
+    return `<div class="contact">
+      <div class="avatar">${initials(c.name)}</div>
+      <div class="info">
+        <div class="cn">${c.name||'Contact'}</div>
+        ${c.role||c.org?`<div class="cr">${[c.role,c.org].filter(Boolean).join(' — ')}</div>`:''}
+        ${meta?`<div class="cmeta">${meta}</div>`:''}
+        <div class="cactions">
+          <button class="mini" onclick="saveOne(${c.id})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+            Ajouter au téléphone</button>
+          <button class="mini warn" onclick="delOne(${c.id})">Supprimer</button>
+        </div>
+      </div></div>`;
+  }).join('');
+}
+function saveOne(id){
+  const c=contacts.find(x=>x.id===id); if(!c) return;
+  const vcf=c.raw && /BEGIN:VCARD/i.test(c.raw)?c.raw:buildVCard({first:c.first||c.name,last:c.last,role:c.role,org:c.org,phone:c.phone,email:c.email,linkedin:c.linkedin});
+  downloadBlob(vcf,`${(c.name||'contact').replace(/\s+/g,'_')}.vcf`,'text/vcard');
+  toast('Ouvre le fichier pour l\'ajouter');
+}
+async function delOne(id){
+  contacts=contacts.filter(x=>x.id!==id);
+  await store.set('contacts',contacts); renderContacts();
+}
+function exportAll(){
+  const all=contacts.map(c=> c.raw && /BEGIN:VCARD/i.test(c.raw)?c.raw:buildVCard({first:c.first||c.name,last:c.last,role:c.role,org:c.org,phone:c.phone,email:c.email,linkedin:c.linkedin}) ).join('\r\n');
+  downloadBlob(all,`contacts_${EVENT.tag.replace(/\s+/g,'_')}.vcf`,'text/vcard');
+  toast('Tous les contacts exportés');
+}
+
+/* ---- init ---- */
+(async function(){
+  profile=await store.get('profile');
+  contacts=await store.get('contacts')||[];
+  renderCard();
+})();
+window.addEventListener('pagehide',stopScanner);
+
+/* ---- installation PWA ---- */
+let deferredPrompt=null;
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone=window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+
+function showInstall(){ if(!isStandalone) $('installBtn').hidden=false; }
+
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; showInstall(); });
+window.addEventListener('appinstalled',()=>{ $('installBtn').hidden=true; deferredPrompt=null; toast('App installée !'); });
+
+// iPhone : pas d'event d'install → on montre le bouton qui ouvre les instructions
+if(isIOS && !isStandalone) showInstall();
+
+async function doInstall(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const {outcome}=await deferredPrompt.userChoice;
+    if(outcome==='accepted'){ $('installBtn').hidden=true; }
+    deferredPrompt=null;
+    return;
+  }
+  if(isIOS){ $('iosHelp').classList.add('show'); return; }
+  toast('Utilise le menu du navigateur → « Installer / Ajouter à l\'écran d\'accueil »');
+}
+
+/* ---- service worker (hors-ligne) ---- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
