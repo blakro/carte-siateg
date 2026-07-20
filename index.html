@@ -537,7 +537,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 const EVENT = {
   name: "Rencontré à SIATeG 2026 — Niamey",
   tag: "SIATeG 2026",
-  place: "Niamey"
+  place: "Centre de Conférence Mahatma Gandhi, Niamey"
 };
 
 /* ============ PROGRAMME (change ceci pour un autre forum) =================== */
@@ -592,8 +592,41 @@ const PROGRAM = {
         { start:"16:30", end:"18:00", brk:true, kind:"Clôture",
           title:"Prière · Networking · Visite des stands — fin de la 1ère journée", who:["Tous"] }
       ]
+    },
+    {
+      date: "2026-07-24",            // Jour 2 — formations & ateliers pratiques (en parallèle)
+      label: "Jour 2 — 24 juillet · Formations & ateliers (en parallèle)",
+      sessions: [
+        { start:"08:00", end:"10:00", place:"Présentiel", kind:"Workshop 1", salle:"TBD",
+          title:"Développement d'applications IA en langues locales" },
+        { start:"08:00", end:"10:00", place:"Présentiel", kind:"Workshop 2", salle:"TBD",
+          title:"Protection des données personnelles à l'ère de l'IA",
+          lead:"Cabinet Koleram Leader Élite" },
+        { start:"10:00", end:"11:00", place:"Présentiel", kind:"Workshop 3", salle:"TBD",
+          title:"Les bases de l'intelligence artificielle",
+          lead:"Communauté IA du Niger" },
+        { start:"10:00", end:"11:00", place:"Présentiel", kind:"Workshop 4", salle:"TBD",
+          title:"Détection des maladies agricoles, prévisions climatiques et agriculture intelligente",
+          lead:"GeoMinds Africa" },
+        { start:"11:00", end:"13:00", place:"Présentiel", kind:"Workshop 5", salle:"TBD",
+          title:"SIG et télédétection pour les non-spécialistes",
+          lead:"Université André Salissou" },
+        { start:"11:00", end:"13:00", place:"Présentiel", kind:"Workshop 6", salle:"TBD",
+          title:"IA générative : usages, limites et opportunités",
+          lead:"ZAMOHA Nouvelles Technologies" },
+        { start:"13:00", end:"14:00", brk:true, kind:"Pause",
+          title:"Pause déjeuner · Prière · Visite des stands", who:["Tous"] },
+        { start:"14:00", end:"16:00", place:"Présentiel", kind:"Workshop 7", salle:"TBD",
+          title:"IA pour le marketing digital — formation en langue Haoussa",
+          lead:"Communauté Python" },
+        { start:"14:00", end:"16:00", place:"Présentiel", kind:"Workshop 8", salle:"TBD",
+          title:"Comment construire un chatbot IA" },
+        { start:"16:30", end:"17:00", place:"Présentiel", kind:"Cérémonie de clôture",
+          title:"Clôture SIATeG 2026",
+          desc:"Lecture des recommandations issues des discussions · Allocution de clôture par la DG ANSI · Allocution de clôture par le Ministre de la Télécommunication et des NTI.",
+          who:["Promoteur SIATeG","ANSI","MCNTI"] }
+      ]
     }
-    /* , { date:"2026-07-24", label:"Jour 2 — 24 juillet", sessions:[ ... ] }  // à compléter */
   ]
 };
 /* =========================================================================== */
@@ -978,7 +1011,6 @@ function renderProgram(){
 
   // bandeau
   const days=PROGRAM.days;
-  const span=days.length>1 ? `${days[0].label.split('—')[1]||''}–${days[days.length-1].label.split('—')[1]||''}`.trim() : days[0].label;
   $('progWhen').textContent=`${EVENT.tag} · ${EVENT.place||''}`.trim();
   const firstStart=slotDate(days[0].date,days[0].sessions[0].start);
   if(now<firstStart){
@@ -1003,7 +1035,9 @@ function renderProgram(){
       const tags=[];
       if(s.kind) tags.push(`<span class="stag kind">${s.kind}</span>`);
       if(s.place) tags.push(`<span class="stag place">${s.place}</span>`);
+      if(s.salle) tags.push(`<span class="stag">Salle : ${s.salle}</span>`);
       const who=(s.who&&s.who.length)?`<div class="slot-who">${s.who.map(w=>`<div class="w">${w}</div>`).join('')}</div>`:'';
+      const lead=s.lead?`<div class="slot-mod">Formateur : <b>${s.lead}</b></div>`:'';
       const mod=s.mod?`<div class="slot-mod">Modérateur : <b>${s.mod}</b></div>`:'';
       const desc=s.desc?`<div class="slot-desc">${s.desc}</div>`:'';
       const ics=s.brk?'':`<button class="slot-ics" onclick="exportSession(${di},${si})">${svgCal} Ajouter au calendrier</button>`;
@@ -1012,7 +1046,7 @@ function renderProgram(){
         <div class="slot-card">
           ${tags.length?`<div class="slot-tags">${tags.join('')}</div>`:''}
           <div class="slot-title">${s.title}</div>
-          ${desc}${who}${mod}${ics}
+          ${desc}${who}${lead}${mod}${ics}
         </div></div>`;
     });
     html+=`</div>`;
@@ -1031,10 +1065,12 @@ function icsEsc(s){ return (s||'').replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\
 function icsStamp(){ return new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
 function icsDT(date,t){ return date.replace(/-/g,'')+'T'+t.replace(':','')+'00'; }
 function vevent(day,s){
-  const uid=`siateg-${day.date}-${s.start.replace(':','')}@carte-siateg`;
+  const slug=(s.title||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,28);
+  const uid=`siateg-${day.date}-${s.start.replace(':','')}-${slug}@carte-siateg`;
   const descParts=[];
   if(s.desc) descParts.push(s.desc);
   if(s.who&&s.who.length) descParts.push('Intervenants : '+s.who.join(', '));
+  if(s.lead) descParts.push('Formateur : '+s.lead);
   if(s.mod) descParts.push('Modérateur : '+s.mod);
   const L=['BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+icsStamp(),
     'DTSTART:'+icsDT(day.date,s.start),'DTEND:'+icsDT(day.date,s.end),

@@ -46,7 +46,7 @@ Ouvre `index.html`, tout en haut du script cherche le bloc `EVENT` :
 const EVENT = {
   name: "Rencontré à SIATeG 2026 — Niamey",
   tag: "SIATeG 2026",
-  place: "Niamey"
+  place: "Centre de Conférence Mahatma Gandhi, Niamey"
 };
 ```
 Change ces valeurs (elles apparaissent dans la note des contacts et les exports).
