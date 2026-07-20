@@ -1,11 +1,13 @@
 /* Carte SIATeG — service worker
    Précache le "shell" de l'app pour un lancement hors-ligne,
    et met en cache à la volée les ressources externes (polices, libs, moteur OCR). */
-const CACHE = 'carte-forum-v1';
+const CACHE = 'carte-forum-v2';   // v2 : purge les anciens caches (réponses CDN erronées incluses)
 const SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './vendor/qrcode.min.js',
+  './vendor/jsQR.js',
   './icon-192.png',
   './icon-512.png',
   './icon-512-maskable.png',

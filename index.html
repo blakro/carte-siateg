@@ -12,9 +12,9 @@
 <meta name="apple-mobile-web-app-title" content="Carte SIATeG">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="icon" type="image/png" href="./icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<script src="./vendor/qrcode.min.js"></script>
+<script src="./vendor/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js" defer></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
 
@@ -107,8 +107,16 @@ header{padding:22px 2px 12px;}
 .reticle i.tr{top:0;right:0;border-left:0;border-bottom:0;}
 .reticle i.bl{bottom:0;left:0;border-right:0;border-top:0;}
 #qr img,#qr canvas{display:block;width:100%!important;height:100%!important;}
+.qr-fallback{font-family:'Space Mono';font-size:10px;line-height:1.5;color:#8a8574;
+  text-align:center;padding:14px;display:flex;align-items:center;justify-content:center;
+  height:100%;}
 .qr-hint{text-align:center;font-family:'Space Mono';font-size:10.5px;
   color:#8a8574;letter-spacing:.04em;margin-top:8px;}
+.qr-mode{display:flex;gap:7px;justify-content:center;margin-top:12px;}
+.qr-mode button{border:1px solid #d5d0c2;background:transparent;color:#8a8574;
+  border-radius:99px;padding:7px 13px;font-family:'Space Mono';font-size:10px;
+  letter-spacing:.03em;cursor:pointer;transition:.15s;}
+.qr-mode button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:18px;
   padding:34px 22px;text-align:center;color:var(--muted);}
@@ -265,6 +273,60 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 .card-thumb{width:52px;height:34px;object-fit:cover;border-radius:7px;
   border:1px solid var(--line);}
 
+/* ===== agenda / programme ===== */
+.prog-banner{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:12px 15px;margin:2px 2px 16px;display:flex;align-items:center;gap:11px;}
+.prog-banner .pb-ico{flex:none;width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-soft));
+  display:flex;align-items:center;justify-content:center;color:#fff;}
+.prog-banner .pb-t{font-family:'Space Grotesk';font-weight:600;font-size:14px;}
+.prog-banner .pb-s{font-family:'Space Mono';font-size:11px;color:var(--muted);margin-top:2px;}
+
+.day-head{display:flex;align-items:center;gap:10px;margin:4px 2px 14px;
+  font-family:'Space Mono';font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-soft);}
+.day-head::after{content:"";flex:1;height:1px;background:var(--line);}
+
+.timeline{position:relative;margin:0 2px;}
+.slot{position:relative;padding:0 0 16px 22px;
+  border-left:2px solid var(--line);}
+.slot:last-child{border-left-color:transparent;}
+.slot::before{content:"";position:absolute;left:-7px;top:3px;width:11px;height:11px;
+  border-radius:50%;background:var(--ground);border:2px solid var(--muted);}
+.slot .st-time{font-family:'Space Mono';font-size:11px;color:var(--accent-soft);
+  letter-spacing:.02em;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.slot .st-status{font-family:'Space Grotesk';font-weight:600;font-size:9.5px;letter-spacing:.06em;
+  text-transform:uppercase;padding:2px 7px;border-radius:99px;}
+.slot.now::before{background:var(--accent);border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(255,76,1,.18);animation:ping 2.4s ease-out infinite;}
+.slot.now{border-left-color:var(--accent);}
+.slot.now .st-status{background:var(--accent);color:#fff;}
+.slot.next::before{background:var(--accent-soft);border-color:var(--accent-soft);}
+.slot.next .st-status{background:var(--surface-2);color:var(--accent-soft);border:1px solid var(--accent-soft);}
+.slot.past{opacity:.5;}
+.slot.past .st-status{background:var(--surface-2);color:var(--muted);}
+
+.slot-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:13px 14px;}
+.slot.now .slot-card{border-color:rgba(255,76,1,.4);}
+.slot.brk .slot-card{background:transparent;border-style:dashed;padding:10px 14px;}
+.slot-tags{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px;}
+.stag{font-family:'Space Mono';font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 8px;border-radius:7px;background:var(--surface-2);color:var(--muted);}
+.stag.kind{color:var(--accent-soft);background:rgba(255,138,91,.12);}
+.stag.place{color:#8ab4ff;background:rgba(138,180,255,.1);}
+.slot-title{font-family:'Space Grotesk';font-weight:600;font-size:15px;line-height:1.3;}
+.slot.brk .slot-title{font-weight:500;font-size:13.5px;color:var(--muted);}
+.slot-desc{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
+.slot-who{margin-top:9px;display:flex;flex-direction:column;gap:3px;}
+.slot-who .w{font-size:12px;color:#aeb9cb;display:flex;gap:7px;align-items:flex-start;}
+.slot-who .w::before{content:"›";color:var(--accent);flex:none;}
+.slot-mod{font-family:'Space Mono';font-size:10.5px;color:#63718a;margin-top:8px;}
+.slot-mod b{color:var(--accent-soft);font-weight:400;}
+.slot-ics{margin-top:11px;border:0;background:var(--surface-2);color:var(--ink);
+  border-radius:9px;padding:8px 11px;font-size:12px;font-weight:600;font-family:'Space Grotesk';
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.slot-ics:active{transform:scale(.95);}
+
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important;}
 }
@@ -306,7 +368,11 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
       <div class="reticle"><i class="tr"></i><i class="bl"></i>
         <div id="qr"></div>
       </div>
-      <div class="qr-hint">SCANNE-MOI AVEC TON APPAREIL PHOTO</div>
+      <div class="qr-hint" id="qrHint">SCANNE-MOI AVEC TON APPAREIL PHOTO</div>
+      <div class="qr-mode" id="qrModeRow" style="display:none">
+        <button id="qm-link" onclick="setQrMode('link')">Carte + app</button>
+        <button id="qm-vcard" onclick="setQrMode('vcard')">Contact direct</button>
+      </div>
     </div>
 
     <div class="row" id="cardActions" style="display:none">
@@ -383,6 +449,30 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
     </div>
   </section>
 
+  <!-- ===== AGENDA ===== -->
+  <section class="view" id="v-prog">
+    <div class="eyebrow">Programme du forum</div>
+
+    <div class="prog-banner">
+      <div class="pb-ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+      </div>
+      <div>
+        <div class="pb-t" id="progWhen">—</div>
+        <div class="pb-s" id="progNow">—</div>
+      </div>
+    </div>
+
+    <div id="progBody"></div>
+
+    <div class="row">
+      <button class="btn ghost" onclick="exportAgenda()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Ajouter l'agenda à mon calendrier (.ics)</button>
+    </div>
+    <div class="ocr-note">Fichier .ics standard — s'ouvre dans Google Agenda, Apple Calendrier, Outlook…</div>
+  </section>
+
 </div>
 
 <!-- nav -->
@@ -397,6 +487,9 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
     <button class="tab" data-tab="list" onclick="go('list')">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
       Contacts</button>
+    <button class="tab" data-tab="prog" onclick="go('prog')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 14h.01M12 14h4M8 17h4"/></svg>
+      Agenda</button>
   </div>
 </nav>
 
@@ -449,21 +542,153 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   </div>
 </div>
 
+<!-- carte reçue via lien QR -->
+<div class="modal" id="receive">
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="eyebrow" style="margin:0 0 14px">On te partage une carte 🎉</div>
+    <div class="contact" style="margin-bottom:16px">
+      <div class="avatar" id="rcAv">?</div>
+      <div class="info">
+        <div class="cn" id="rcName"></div>
+        <div class="cr" id="rcRole"></div>
+        <div class="cmeta" id="rcMeta"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:0">
+      <button class="btn primary" onclick="receiveSave()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Enregistrer le contact</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="receiveCreate()">Créer ma carte à mon tour →</button>
+    </div>
+    <div style="text-align:center;margin-top:13px">
+      <button class="mini" onclick="receiveClose()">Plus tard</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
 
 <script>
 /* ============ CONFIG ÉVÉNEMENT (change ceci pour un autre forum) ============ */
 const EVENT = {
   name: "Rencontré à SIATeG 2026 — Niamey",
-  tag: "SIATeG 2026"
+  tag: "SIATeG 2026",
+  place: "Centre de Conférence Mahatma Gandhi, Niamey"
+};
+
+/* ============ PROGRAMME (change ceci pour un autre forum) =================== */
+/* Chaque session : start/end en "HH:MM", place (Présentiel/Hybride), kind (badge),
+   title, desc (facultatif), who[] (intervenants), mod (modérateur), brk:true pour
+   les pauses/logistique. Ajoute un objet dans "days" pour une nouvelle journée. */
+const PROGRAM = {
+  days: [
+    {
+      date: "2026-07-23",            // Jour 1 — sert au statut "en cours" et à l'export .ics
+      label: "Jour 1 — 23 juillet",
+      sessions: [
+        { start:"07:30", end:"08:30", brk:true, kind:"Accueil",
+          title:"Confirmation d'inscription, accueil et installation des invités",
+          who:["Organisateurs"] },
+        { start:"08:30", end:"09:00", place:"Présentiel", kind:"Cérémonie d'ouverture",
+          title:"Cérémonie d'ouverture",
+          desc:"Allocution du Promoteur SIATeG · Allocution de la Directrice Générale de l'ANSI · Mot d'ouverture du Ministre de la Communication et des NTI · Présentation des candidats représentant le Niger à l'Olympiade Internationale de l'Intelligence Artificielle au Kazakhstan.",
+          who:["MC & Organisateurs"] },
+        { start:"09:00", end:"09:10", brk:true, kind:"Pause",
+          title:"Courte pause pour les officiels", who:["Organisateurs"] },
+        { start:"09:10", end:"10:00", place:"Présentiel", kind:"Panel de haut niveau",
+          title:"Intelligence Artificielle et services géospatiaux : construire des solutions durables pour un Niger résilient",
+          desc:"Visite des stands + interviews média + photo de famille",
+          who:["Ministre de la Communication et des NTI","DG ANSI","Représentant résident – PNUD Niger","DG ESCEP","Iro Amadou"],
+          mod:"GeoMinds Africa" },
+        { start:"10:00", end:"10:30", brk:true, kind:"Pause",
+          title:"Pause café · Networking · Visite des stands", who:["Tous"] },
+        { start:"10:30", end:"11:00", place:"Hybride", kind:"Conférence",
+          title:"Digital Earth Africa platforms for informed climate resilient initiatives",
+          who:["Digital Earth Africa"] },
+        { start:"11:00", end:"12:00", place:"Présentiel", kind:"Panel 1",
+          title:"IA & FinTech : réinventer les services financiers pour une économie inclusive et intelligente",
+          who:["Association FinTech Niger","iFuture","Ecobank Niger"] },
+        { start:"12:00", end:"13:00", place:"Présentiel", kind:"Panel 2",
+          title:"Digitalisation des services publics : intégrer l'IA & les technologies géospatiales dans l'administration et l'économie nigériennes",
+          who:["ANSI","Université André Salissou","NOVATECH"],
+          mod:"Impact Plus" },
+        { start:"13:00", end:"14:00", brk:true, kind:"Pause",
+          title:"Prière · Pause déjeuner · Visite des stands", who:["Tous"] },
+        { start:"14:00", end:"15:00", place:"Présentiel", kind:"Conférence-Panel",
+          title:"IA Made in Niger : construire des solutions durables pour un Niger résilient — retours d'expériences",
+          who:["Techinnov","Niger Python Community","ALFAJAR","QWIPER SAAS"] },
+        { start:"15:00", end:"15:40", place:"Présentiel", kind:"Panel 4",
+          title:"TV White Space et infrastructures intelligentes pour la connectivité rurale",
+          who:["ANSI","ARCEP","Airtel Niger","ESCEP"],
+          mod:"ESCEP" },
+        { start:"15:40", end:"16:30", place:"Présentiel", kind:"Panel 5",
+          title:"IA, protection des enfants et données personnelles",
+          who:["Ministère de la Justice et des Droits de l'Homme","UNICEF","SoRa Conseil","DGPN/PJ"],
+          mod:"Sarki Excellence" },
+        { start:"16:30", end:"18:00", brk:true, kind:"Clôture",
+          title:"Prière · Networking · Visite des stands — fin de la 1ère journée", who:["Tous"] }
+      ]
+    },
+    {
+      date: "2026-07-24",            // Jour 2 — formations & ateliers pratiques (en parallèle)
+      label: "Jour 2 — 24 juillet · Formations & ateliers (en parallèle)",
+      sessions: [
+        { start:"08:00", end:"10:00", place:"Présentiel", kind:"Workshop 1", salle:"TBD",
+          title:"Développement d'applications IA en langues locales" },
+        { start:"08:00", end:"10:00", place:"Présentiel", kind:"Workshop 2", salle:"TBD",
+          title:"Protection des données personnelles à l'ère de l'IA",
+          lead:"Cabinet Koleram Leader Élite" },
+        { start:"10:00", end:"11:00", place:"Présentiel", kind:"Workshop 3", salle:"TBD",
+          title:"Les bases de l'intelligence artificielle",
+          lead:"Communauté IA du Niger" },
+        { start:"10:00", end:"11:00", place:"Présentiel", kind:"Workshop 4", salle:"TBD",
+          title:"Détection des maladies agricoles, prévisions climatiques et agriculture intelligente",
+          lead:"GeoMinds Africa" },
+        { start:"11:00", end:"13:00", place:"Présentiel", kind:"Workshop 5", salle:"TBD",
+          title:"SIG et télédétection pour les non-spécialistes",
+          lead:"Université André Salissou" },
+        { start:"11:00", end:"13:00", place:"Présentiel", kind:"Workshop 6", salle:"TBD",
+          title:"IA générative : usages, limites et opportunités",
+          lead:"ZAMOHA Nouvelles Technologies" },
+        { start:"13:00", end:"14:00", brk:true, kind:"Pause",
+          title:"Pause déjeuner · Prière · Visite des stands", who:["Tous"] },
+        { start:"14:00", end:"16:00", place:"Présentiel", kind:"Workshop 7", salle:"TBD",
+          title:"IA pour le marketing digital — formation en langue Haoussa",
+          lead:"Communauté Python" },
+        { start:"14:00", end:"16:00", place:"Présentiel", kind:"Workshop 8", salle:"TBD",
+          title:"Comment construire un chatbot IA" },
+        { start:"16:30", end:"17:00", place:"Présentiel", kind:"Cérémonie de clôture",
+          title:"Clôture SIATeG 2026",
+          desc:"Lecture des recommandations issues des discussions · Allocution de clôture par la DG ANSI · Allocution de clôture par le Ministre de la Télécommunication et des NTI.",
+          who:["Promoteur SIATeG","ANSI","MCNTI"] }
+      ]
+    }
+  ]
 };
 /* =========================================================================== */
 
-/* ---- stockage persistant (compatible artifact + fallback mémoire) ---- */
+/* ---- stockage persistant : localStorage (app installée/hébergée) →
+       window.storage (aperçu claude.ai) → mémoire (dernier recours) ---- */
 const mem = {};
+const SKEY = 'siateg:';
+function lsGet(k){ try{ const v=localStorage.getItem(SKEY+k); return v==null?undefined:JSON.parse(v); }catch(e){ return undefined; } }
+function lsSet(k,v){ try{ localStorage.setItem(SKEY+k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 const store = {
-  async get(k){ try{ const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; }catch(e){ return (k in mem)? mem[k] : null; } },
-  async set(k,v){ mem[k]=v; try{ await window.storage.set(k, JSON.stringify(v)); }catch(e){} }
+  async get(k){
+    const v=lsGet(k); if(v!==undefined) return v;                 // 1) localStorage
+    try{ if(window.storage && window.storage.get){                // 2) aperçu claude.ai
+      const r=await window.storage.get(k); if(r) return JSON.parse(r.value);
+    } }catch(e){}
+    return (k in mem)? mem[k] : null;                             // 3) mémoire
+  },
+  async set(k,v){
+    mem[k]=v;
+    lsSet(k,v);
+    try{ if(window.storage && window.storage.set) await window.storage.set(k, JSON.stringify(v)); }catch(e){}
+  }
 };
 
 let profile = null;
@@ -476,6 +701,11 @@ function toast(msg){ $('toastMsg').textContent = msg; $('toast').classList.add('
 function normUrl(u){ if(!u) return ''; u=u.trim(); return /^https?:\/\//i.test(u)?u:'https://'+u; }
 function escapeVcf(s){ return (s||'').replace(/([;,\\])/g,'\\$1').replace(/\n/g,'\\n'); }
 function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+
+/* ---- lien de partage (QR "carte + app") ---- */
+function b64urlEncode(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64urlDecode(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
+function appUrl(){ return /^https?:$/.test(location.protocol) ? location.origin+location.pathname : ''; }
 
 /* ---- vCard ---- */
 function buildVCard(p){
@@ -498,11 +728,12 @@ let currentView='card';
 function go(view){
   currentView=view;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  const map={card:'v-card',edit:'v-edit',scan:'v-scan',list:'v-list'};
+  const map={card:'v-card',edit:'v-edit',scan:'v-scan',list:'v-list',prog:'v-prog'};
   $(map[view]).classList.add('active');
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===view));
   if(view==='edit') fillForm();
   if(view==='list') renderContacts();
+  if(view==='prog') startProgram(); else stopProgram();
   if(view==='scan') startScanner(); else stopScanner();
 }
 
@@ -552,10 +783,29 @@ function renderCard(){
   $('dDetails').innerHTML=rows.join('');
   $('dDetails').style.display = rows.length?'flex':'none';
 
+  // contenu du QR : lien "carte + app" (viral) ou vCard directe (hors-ligne)
+  const url=appUrl();
+  const mode=(url && lsGet('qrmode')!=='vcard') ? 'link' : 'vcard';
+  const vcf=buildVCard(profile);
+  const payload = mode==='link' ? url+'#c='+b64urlEncode(vcf) : vcf;
+  $('qrModeRow').style.display = url ? 'flex' : 'none';
+  $('qm-link').classList.toggle('on', mode==='link');
+  $('qm-vcard').classList.toggle('on', mode==='vcard');
+  $('qrHint').textContent = mode==='link'
+    ? 'SCANNE-MOI — TU REÇOIS MA CARTE + L\'APP'
+    : 'SCANNE-MOI AVEC TON APPAREIL PHOTO';
+
   const box=$('qr'); box.innerHTML='';
-  new QRCode(box,{ text:buildVCard(profile), width:178, height:178,
-    colorDark:'#141a24', colorLight:'#F4F2EA', correctLevel:QRCode.CorrectLevel.M });
+  const qrFail=()=>{ box.innerHTML='<div class="qr-fallback">QR indisponible sur cet appareil.<br>Utilise « Partager » pour envoyer ta carte.</div>'; };
+  if(typeof QRCodeLib==='undefined'){ qrFail(); return; }
+  const cv=document.createElement('canvas');
+  QRCodeLib.toCanvas(cv, payload,
+    { width:178, margin:1, errorCorrectionLevel:'M',
+      color:{ dark:'#141a24', light:'#F4F2EA' } })
+    .then(()=>box.appendChild(cv))
+    .catch(qrFail);
 }
+function setQrMode(m){ lsSet('qrmode',m); renderCard(); }
 function det(icon,txt){
   return `<div class="det"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>${txt}</div>`;
 }
@@ -743,6 +993,9 @@ function parseVCard(txt){
 }
 async function handleScan(data){
   stopScanner();
+  // lien "carte + app" d'un autre participant → on en extrait la vCard
+  const lm=data.match(/#c=([A-Za-z0-9\-_]+)/);
+  if(lm){ try{ const v=b64urlDecode(lm[1]); if(/BEGIN:VCARD/i.test(v)) data=v; }catch(e){} }
   let c;
   if(/BEGIN:VCARD/i.test(data)){
     c=parseVCard(data);
@@ -757,6 +1010,9 @@ async function handleScan(data){
   } else {
     c={ name:'Note scannée', first:'Note', last:'', role:'', org:'',
         phone:'', email:'', linkedin:'', note:data, raw:data };
+  }
+  if(contacts.some(x=>x.name===c.name && x.phone===c.phone)){
+    toast('Déjà dans tes contacts : '+c.name); go('list'); return;
   }
   c.id=Date.now(); c.tag=EVENT.tag;
   contacts.unshift(c); await store.set('contacts',contacts);
@@ -807,32 +1063,194 @@ function exportAll(){
   toast('Tous les contacts exportés');
 }
 
+/* ---- agenda / programme ---- */
+let progTimer=null;
+function fmtHM(t){ return t.replace(':','h'); }
+function slotDate(dayDate,t){ return new Date(`${dayDate}T${t}:00`); }
+
+function statusOf(now){
+  // renvoie une fonction qui classe un créneau et repère le prochain à venir
+  let nextKey=null;
+  const rows=[];
+  PROGRAM.days.forEach((d,di)=>d.sessions.forEach((s,si)=>{
+    const st=slotDate(d.date,s.start), en=slotDate(d.date,s.end);
+    let cls='next-candidate';
+    if(now>en) cls='past';
+    else if(now>=st && now<=en) cls='now';
+    else cls='upcoming';
+    rows.push({di,si,cls,st});
+  }));
+  // le "prochain" = premier créneau à venir s'il n'y a aucun "en cours"
+  const anyNow=rows.some(r=>r.cls==='now');
+  if(!anyNow){ const up=rows.filter(r=>r.cls==='upcoming').sort((a,b)=>a.st-b.st)[0];
+    if(up) nextKey=up.di+'-'+up.si; }
+  const map={}; rows.forEach(r=>map[r.di+'-'+r.si]=r.cls);
+  return {map,nextKey,anyNow};
+}
+
+function renderProgram(){
+  const now=new Date();
+  const {map,nextKey,anyNow}=statusOf(now);
+
+  // bandeau
+  const days=PROGRAM.days;
+  $('progWhen').textContent=`${EVENT.tag} · ${EVENT.place||''}`.trim();
+  const firstStart=slotDate(days[0].date,days[0].sessions[0].start);
+  if(now<firstStart){
+    const dd=Math.ceil((firstStart-now)/86400000);
+    $('progNow').textContent = dd>1 ? `Ouverture dans ${dd} jours` : `Le forum ouvre bientôt`;
+  } else {
+    const active=[];
+    days.forEach(d=>d.sessions.forEach(s=>{
+      if(now>=slotDate(d.date,s.start)&&now<=slotDate(d.date,s.end)&&!s.brk) active.push(s.title);
+    }));
+    $('progNow').textContent = active.length ? 'En cours : '+active[0] : 'Programme du jour';
+  }
+
+  const svgCal='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M12 13v4M10 15h4"/></svg>';
+  let html='';
+  days.forEach((d,di)=>{
+    html+=`<div class="day-head">${d.label}</div><div class="timeline">`;
+    d.sessions.forEach((s,si)=>{
+      const key=di+'-'+si;
+      let cls=map[key]==='now'?'now':map[key]==='past'?'past':(key===nextKey?'next':'');
+      const label=map[key]==='now'?'En cours':map[key]==='past'?'Terminé':(key===nextKey?'À suivre':'');
+      const tags=[];
+      if(s.kind) tags.push(`<span class="stag kind">${s.kind}</span>`);
+      if(s.place) tags.push(`<span class="stag place">${s.place}</span>`);
+      if(s.salle) tags.push(`<span class="stag">Salle : ${s.salle}</span>`);
+      const who=(s.who&&s.who.length)?`<div class="slot-who">${s.who.map(w=>`<div class="w">${w}</div>`).join('')}</div>`:'';
+      const lead=s.lead?`<div class="slot-mod">Formateur : <b>${s.lead}</b></div>`:'';
+      const mod=s.mod?`<div class="slot-mod">Modérateur : <b>${s.mod}</b></div>`:'';
+      const desc=s.desc?`<div class="slot-desc">${s.desc}</div>`:'';
+      const ics=s.brk?'':`<button class="slot-ics" onclick="exportSession(${di},${si})">${svgCal} Ajouter au calendrier</button>`;
+      html+=`<div class="slot ${s.brk?'brk':''} ${cls}">
+        <div class="st-time">${fmtHM(s.start)} – ${fmtHM(s.end)}${label?`<span class="st-status">${label}</span>`:''}</div>
+        <div class="slot-card">
+          ${tags.length?`<div class="slot-tags">${tags.join('')}</div>`:''}
+          <div class="slot-title">${s.title}</div>
+          ${desc}${who}${lead}${mod}${ics}
+        </div></div>`;
+    });
+    html+=`</div>`;
+  });
+  $('progBody').innerHTML=html;
+}
+function startProgram(){
+  renderProgram();
+  clearInterval(progTimer);
+  progTimer=setInterval(renderProgram,60000); // rafraîchit le statut chaque minute
+}
+function stopProgram(){ clearInterval(progTimer); progTimer=null; }
+
+/* ---- export .ics ---- */
+function icsEsc(s){ return (s||'').replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n'); }
+function icsStamp(){ return new Date().toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
+function icsDT(date,t){ return date.replace(/-/g,'')+'T'+t.replace(':','')+'00'; }
+function vevent(day,s){
+  const slug=(s.title||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,28);
+  const uid=`siateg-${day.date}-${s.start.replace(':','')}-${slug}@carte-siateg`;
+  const descParts=[];
+  if(s.desc) descParts.push(s.desc);
+  if(s.who&&s.who.length) descParts.push('Intervenants : '+s.who.join(', '));
+  if(s.lead) descParts.push('Formateur : '+s.lead);
+  if(s.mod) descParts.push('Modérateur : '+s.mod);
+  const L=['BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+icsStamp(),
+    'DTSTART:'+icsDT(day.date,s.start),'DTEND:'+icsDT(day.date,s.end),
+    'SUMMARY:'+icsEsc((s.kind&&!s.brk?s.kind+' — ':'')+s.title)];
+  if(descParts.length) L.push('DESCRIPTION:'+icsEsc(descParts.join('\n')));
+  L.push('LOCATION:'+icsEsc([s.place,EVENT.place].filter(Boolean).join(' · ')||EVENT.place||''));
+  L.push('END:VEVENT');
+  return L.join('\r\n');
+}
+function wrapIcs(events){
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//SIATeG//Agenda//FR','CALSCALE:GREGORIAN',
+    ...events,'END:VCALENDAR'].join('\r\n');
+}
+function exportSession(di,si){
+  const day=PROGRAM.days[di], s=day.sessions[si];
+  downloadBlob(wrapIcs([vevent(day,s)]),
+    `siateg_${s.start.replace(':','')}.ics`,'text/calendar');
+  toast('Session ajoutée au calendrier');
+}
+function exportAgenda(){
+  const evs=[];
+  PROGRAM.days.forEach(d=>d.sessions.forEach(s=>{ if(!s.brk) evs.push(vevent(d,s)); }));
+  downloadBlob(wrapIcs(evs),`agenda_${EVENT.tag.replace(/\s+/g,'_')}.ics`,'text/calendar');
+  toast('Agenda complet exporté (.ics)');
+}
+
+/* ---- réception d'une carte via lien QR (#c=...) ---- */
+let pendingReceive=null;
+function checkIncoming(){
+  const m=location.hash.match(/#c=([A-Za-z0-9\-_]+)/);
+  if(!m) return;
+  history.replaceState(null,'',location.pathname+location.search);
+  let vcf; try{ vcf=b64urlDecode(m[1]); }catch(e){ return; }
+  if(!/BEGIN:VCARD/i.test(vcf)) return;
+  const c=parseVCard(vcf);
+  if(!c.name) c.name='Contact';
+  pendingReceive=c;
+  $('rcAv').textContent=initials(c.name);
+  $('rcName').textContent=c.name;
+  $('rcRole').textContent=[c.role,c.org].filter(Boolean).join(' — ');
+  $('rcMeta').textContent=[c.phone,c.email].filter(Boolean).join(' · ');
+  $('receive').classList.add('show');
+}
+async function storeIncoming(){
+  const c=pendingReceive; if(!c) return null;
+  if(!contacts.some(x=>x.name===c.name && x.phone===c.phone)){
+    c.id=Date.now(); c.tag=EVENT.tag;
+    contacts.unshift(c); await store.set('contacts',contacts);
+  }
+  return c;
+}
+async function receiveSave(){
+  const c=await storeIncoming(); if(!c) return;
+  downloadBlob(c.raw,`${(c.name||'contact').replace(/\s+/g,'_')}.vcf`,'text/vcard');
+  receiveClose(); toast('Ouvre le fichier pour l\'ajouter au téléphone');
+}
+async function receiveCreate(){
+  await storeIncoming();
+  receiveClose();
+  if(profile && (profile.first||profile.last)) go('card');
+  else { go('edit'); toast('Crée ta carte, puis partage ton QR à ton tour !'); }
+}
+function receiveClose(){ $('receive').classList.remove('show'); pendingReceive=null; }
+
 /* ---- init ---- */
 (async function(){
   profile=await store.get('profile');
   contacts=await store.get('contacts')||[];
   renderCard();
+  checkIncoming();
 })();
 window.addEventListener('pagehide',stopScanner);
 
 /* ---- installation PWA ---- */
 let deferredPrompt=null;
 const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
-const isStandalone=window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+const isStandalone=['standalone','fullscreen','minimal-ui'].some(m=>window.matchMedia(`(display-mode: ${m})`).matches)
+  || window.navigator.standalone===true
+  || document.referrer.startsWith('android-app://');
+const wasInstalled=()=>lsGet('installed')===true;
+function markInstalled(){ lsSet('installed',true); $('installBtn').hidden=true; deferredPrompt=null; }
 
-function showInstall(){ if(!isStandalone) $('installBtn').hidden=false; }
+function showInstall(){ if(!isStandalone && !wasInstalled()) $('installBtn').hidden=false; }
 
 window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; showInstall(); });
-window.addEventListener('appinstalled',()=>{ $('installBtn').hidden=true; deferredPrompt=null; toast('App installée !'); });
+window.addEventListener('appinstalled',()=>{ markInstalled(); toast('App installée !'); });
 
 // iPhone : pas d'event d'install → on montre le bouton qui ouvre les instructions
-if(isIOS && !isStandalone) showInstall();
+if(isIOS && !isStandalone && !wasInstalled()) showInstall();
+// app déjà installée et (re)lancée depuis l'icône → on mémorise pour les ouvertures en navigateur
+if(isStandalone) lsSet('installed',true);
 
 async function doInstall(){
   if(deferredPrompt){
     deferredPrompt.prompt();
     const {outcome}=await deferredPrompt.userChoice;
-    if(outcome==='accepted'){ $('installBtn').hidden=true; }
+    if(outcome==='accepted') markInstalled();
     deferredPrompt=null;
     return;
   }
