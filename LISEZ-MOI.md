@@ -32,6 +32,18 @@ rapide, mais **ne permet PAS** l'installation ni le hors-ligne. Il faut l'héber
 - **iPhone (Safari)** : touche « Installer », puis suis les 3 étapes affichées
   (bouton Partager → « Sur l'écran d'accueil » → Ajouter).
 
+## Partage viral « carte + app »
+Une fois l'app hébergée en HTTPS, le QR de ta carte devient par défaut un **lien
+intelligent** : la personne qui le scanne avec son appareil photo ouvre l'app
+avec ta carte dedans, et choisit en un tap **Enregistrer le contact** et/ou
+**Créer ma carte à mon tour** — elle obtient alors son propre QR viral, et
+l'app se propage de personne en personne. Aucune donnée ne transite par un
+serveur : la carte est encodée dans le lien lui-même.
+
+Un sélecteur sous le QR permet de basculer en mode **« Contact direct »**
+(vCard pure) : utile si le réseau du forum est saturé, car ce mode fonctionne
+sans aucune connexion chez la personne qui scanne (mais n'apporte pas l'app).
+
 ## Onglet Agenda
 Un 4ᵉ onglet **Agenda** affiche le programme du forum sous forme de frise :
 heure, type de session (panel, conférence…), présentiel/hybride, intervenants et

@@ -112,6 +112,11 @@ header{padding:22px 2px 12px;}
   height:100%;}
 .qr-hint{text-align:center;font-family:'Space Mono';font-size:10.5px;
   color:#8a8574;letter-spacing:.04em;margin-top:8px;}
+.qr-mode{display:flex;gap:7px;justify-content:center;margin-top:12px;}
+.qr-mode button{border:1px solid #d5d0c2;background:transparent;color:#8a8574;
+  border-radius:99px;padding:7px 13px;font-family:'Space Mono';font-size:10px;
+  letter-spacing:.03em;cursor:pointer;transition:.15s;}
+.qr-mode button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:18px;
   padding:34px 22px;text-align:center;color:var(--muted);}
@@ -363,7 +368,11 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
       <div class="reticle"><i class="tr"></i><i class="bl"></i>
         <div id="qr"></div>
       </div>
-      <div class="qr-hint">SCANNE-MOI AVEC TON APPAREIL PHOTO</div>
+      <div class="qr-hint" id="qrHint">SCANNE-MOI AVEC TON APPAREIL PHOTO</div>
+      <div class="qr-mode" id="qrModeRow" style="display:none">
+        <button id="qm-link" onclick="setQrMode('link')">Carte + app</button>
+        <button id="qm-vcard" onclick="setQrMode('vcard')">Contact direct</button>
+      </div>
     </div>
 
     <div class="row" id="cardActions" style="display:none">
@@ -533,6 +542,33 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   </div>
 </div>
 
+<!-- carte reçue via lien QR -->
+<div class="modal" id="receive">
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="eyebrow" style="margin:0 0 14px">On te partage une carte 🎉</div>
+    <div class="contact" style="margin-bottom:16px">
+      <div class="avatar" id="rcAv">?</div>
+      <div class="info">
+        <div class="cn" id="rcName"></div>
+        <div class="cr" id="rcRole"></div>
+        <div class="cmeta" id="rcMeta"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:0">
+      <button class="btn primary" onclick="receiveSave()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Enregistrer le contact</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="receiveCreate()">Créer ma carte à mon tour →</button>
+    </div>
+    <div style="text-align:center;margin-top:13px">
+      <button class="mini" onclick="receiveClose()">Plus tard</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
 
 <script>
@@ -666,6 +702,11 @@ function normUrl(u){ if(!u) return ''; u=u.trim(); return /^https?:\/\//i.test(u
 function escapeVcf(s){ return (s||'').replace(/([;,\\])/g,'\\$1').replace(/\n/g,'\\n'); }
 function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
 
+/* ---- lien de partage (QR "carte + app") ---- */
+function b64urlEncode(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64urlDecode(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
+function appUrl(){ return /^https?:$/.test(location.protocol) ? location.origin+location.pathname : ''; }
+
 /* ---- vCard ---- */
 function buildVCard(p){
   const fn = `${p.first||''} ${p.last||''}`.trim();
@@ -742,16 +783,29 @@ function renderCard(){
   $('dDetails').innerHTML=rows.join('');
   $('dDetails').style.display = rows.length?'flex':'none';
 
+  // contenu du QR : lien "carte + app" (viral) ou vCard directe (hors-ligne)
+  const url=appUrl();
+  const mode=(url && lsGet('qrmode')!=='vcard') ? 'link' : 'vcard';
+  const vcf=buildVCard(profile);
+  const payload = mode==='link' ? url+'#c='+b64urlEncode(vcf) : vcf;
+  $('qrModeRow').style.display = url ? 'flex' : 'none';
+  $('qm-link').classList.toggle('on', mode==='link');
+  $('qm-vcard').classList.toggle('on', mode==='vcard');
+  $('qrHint').textContent = mode==='link'
+    ? 'SCANNE-MOI — TU REÇOIS MA CARTE + L\'APP'
+    : 'SCANNE-MOI AVEC TON APPAREIL PHOTO';
+
   const box=$('qr'); box.innerHTML='';
   const qrFail=()=>{ box.innerHTML='<div class="qr-fallback">QR indisponible sur cet appareil.<br>Utilise « Partager » pour envoyer ta carte.</div>'; };
   if(typeof QRCodeLib==='undefined'){ qrFail(); return; }
   const cv=document.createElement('canvas');
-  QRCodeLib.toCanvas(cv, buildVCard(profile),
+  QRCodeLib.toCanvas(cv, payload,
     { width:178, margin:1, errorCorrectionLevel:'M',
       color:{ dark:'#141a24', light:'#F4F2EA' } })
     .then(()=>box.appendChild(cv))
     .catch(qrFail);
 }
+function setQrMode(m){ lsSet('qrmode',m); renderCard(); }
 function det(icon,txt){
   return `<div class="det"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>${txt}</div>`;
 }
@@ -939,6 +993,9 @@ function parseVCard(txt){
 }
 async function handleScan(data){
   stopScanner();
+  // lien "carte + app" d'un autre participant → on en extrait la vCard
+  const lm=data.match(/#c=([A-Za-z0-9\-_]+)/);
+  if(lm){ try{ const v=b64urlDecode(lm[1]); if(/BEGIN:VCARD/i.test(v)) data=v; }catch(e){} }
   let c;
   if(/BEGIN:VCARD/i.test(data)){
     c=parseVCard(data);
@@ -953,6 +1010,9 @@ async function handleScan(data){
   } else {
     c={ name:'Note scannée', first:'Note', last:'', role:'', org:'',
         phone:'', email:'', linkedin:'', note:data, raw:data };
+  }
+  if(contacts.some(x=>x.name===c.name && x.phone===c.phone)){
+    toast('Déjà dans tes contacts : '+c.name); go('list'); return;
   }
   c.id=Date.now(); c.tag=EVENT.tag;
   contacts.unshift(c); await store.set('contacts',contacts);
@@ -1120,11 +1180,50 @@ function exportAgenda(){
   toast('Agenda complet exporté (.ics)');
 }
 
+/* ---- réception d'une carte via lien QR (#c=...) ---- */
+let pendingReceive=null;
+function checkIncoming(){
+  const m=location.hash.match(/#c=([A-Za-z0-9\-_]+)/);
+  if(!m) return;
+  history.replaceState(null,'',location.pathname+location.search);
+  let vcf; try{ vcf=b64urlDecode(m[1]); }catch(e){ return; }
+  if(!/BEGIN:VCARD/i.test(vcf)) return;
+  const c=parseVCard(vcf);
+  if(!c.name) c.name='Contact';
+  pendingReceive=c;
+  $('rcAv').textContent=initials(c.name);
+  $('rcName').textContent=c.name;
+  $('rcRole').textContent=[c.role,c.org].filter(Boolean).join(' — ');
+  $('rcMeta').textContent=[c.phone,c.email].filter(Boolean).join(' · ');
+  $('receive').classList.add('show');
+}
+async function storeIncoming(){
+  const c=pendingReceive; if(!c) return null;
+  if(!contacts.some(x=>x.name===c.name && x.phone===c.phone)){
+    c.id=Date.now(); c.tag=EVENT.tag;
+    contacts.unshift(c); await store.set('contacts',contacts);
+  }
+  return c;
+}
+async function receiveSave(){
+  const c=await storeIncoming(); if(!c) return;
+  downloadBlob(c.raw,`${(c.name||'contact').replace(/\s+/g,'_')}.vcf`,'text/vcard');
+  receiveClose(); toast('Ouvre le fichier pour l\'ajouter au téléphone');
+}
+async function receiveCreate(){
+  await storeIncoming();
+  receiveClose();
+  if(profile && (profile.first||profile.last)) go('card');
+  else { go('edit'); toast('Crée ta carte, puis partage ton QR à ton tour !'); }
+}
+function receiveClose(){ $('receive').classList.remove('show'); pendingReceive=null; }
+
 /* ---- init ---- */
 (async function(){
   profile=await store.get('profile');
   contacts=await store.get('contacts')||[];
   renderCard();
+  checkIncoming();
 })();
 window.addEventListener('pagehide',stopScanner);
 
