@@ -445,8 +445,14 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
       Va dans Scanner pour ajouter les personnes que tu rencontres.
     </div>
     <div class="row" id="exportRow" style="display:none">
-      <button class="btn ghost" onclick="exportAll()">Exporter tout (.vcf)</button>
+      <button class="btn primary" onclick="saveAllToPhone()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+        Tout ajouter à mes contacts</button>
     </div>
+    <div class="row" id="exportRow2" style="display:none;margin-top:10px">
+      <button class="btn ghost" onclick="exportAll()">Exporter le fichier (.vcf)</button>
+    </div>
+    <div class="ocr-note" id="bulkNote" style="display:none">Un seul fichier avec tous tes contacts — Android l'importe dans Google Contacts (Gmail), iPhone dans Contacts.</div>
   </section>
 
   <!-- ===== AGENDA ===== -->
@@ -706,6 +712,29 @@ function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join(
 function b64urlEncode(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function b64urlDecode(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
 function appUrl(){ return /^https?:$/.test(location.protocol) ? location.origin+location.pathname : ''; }
+// format compact (QR moins dense que la vCard complète → scan bien plus fiable)
+function packProfile(p){
+  return b64urlEncode(['1',p.first||'',p.last||'',p.role||'',p.org||'',p.phone||'',p.email||'',p.linkedin||''].join('\n'));
+}
+function unpackProfile(s){
+  let f; try{ f=b64urlDecode(s).split('\n'); }catch(e){ return null; }
+  if(f[0]!=='1') return null;
+  const p={ first:f[1]||'', last:f[2]||'', role:f[3]||'', org:f[4]||'',
+            phone:f[5]||'', email:f[6]||'', linkedin:f[7]||'' };
+  p.name=`${p.first} ${p.last}`.trim();
+  p.raw=buildVCard(p);
+  return p.name?p:null;
+}
+// accepte les deux formats de lien : #p= (compact) et #c= (vCard, ancien)
+function decodeShareLink(str){
+  const m=str.match(/#(p|c)=([A-Za-z0-9\-_]+)/);
+  if(!m) return null;
+  if(m[1]==='p') return unpackProfile(m[2]);
+  try{ const v=b64urlDecode(m[2]);
+    if(/BEGIN:VCARD/i.test(v)){ const c=parseVCard(v); if(!c.name) c.name='Contact'; return c; }
+  }catch(e){}
+  return null;
+}
 
 /* ---- vCard ---- */
 function buildVCard(p){
@@ -787,7 +816,7 @@ function renderCard(){
   const url=appUrl();
   const mode=(url && lsGet('qrmode')!=='vcard') ? 'link' : 'vcard';
   const vcf=buildVCard(profile);
-  const payload = mode==='link' ? url+'#c='+b64urlEncode(vcf) : vcf;
+  const payload = mode==='link' ? url+'#p='+packProfile(profile) : vcf;
   $('qrModeRow').style.display = url ? 'flex' : 'none';
   $('qm-link').classList.toggle('on', mode==='link');
   $('qm-vcard').classList.toggle('on', mode==='vcard');
@@ -799,8 +828,9 @@ function renderCard(){
   const qrFail=()=>{ box.innerHTML='<div class="qr-fallback">QR indisponible sur cet appareil.<br>Utilise « Partager » pour envoyer ta carte.</div>'; };
   if(typeof QRCodeLib==='undefined'){ qrFail(); return; }
   const cv=document.createElement('canvas');
+  // rendu haute résolution (512px) puis réduit par le CSS → net sur mobile, scan fiable
   QRCodeLib.toCanvas(cv, payload,
-    { width:178, margin:1, errorCorrectionLevel:'M',
+    { width:512, margin:2, errorCorrectionLevel: mode==='link'?'L':'M',
       color:{ dark:'#141a24', light:'#F4F2EA' } })
     .then(()=>box.appendChild(cv))
     .catch(qrFail);
@@ -993,9 +1023,9 @@ function parseVCard(txt){
 }
 async function handleScan(data){
   stopScanner();
-  // lien "carte + app" d'un autre participant → on en extrait la vCard
-  const lm=data.match(/#c=([A-Za-z0-9\-_]+)/);
-  if(lm){ try{ const v=b64urlDecode(lm[1]); if(/BEGIN:VCARD/i.test(v)) data=v; }catch(e){} }
+  // lien "carte + app" d'un autre participant → on en extrait la carte
+  const shared=decodeShareLink(data);
+  if(shared) data=shared.raw;
   let c;
   if(/BEGIN:VCARD/i.test(data)){
     c=parseVCard(data);
@@ -1026,10 +1056,13 @@ function renderContacts(){
   $('cCount').textContent=contacts.length;
   if(!contacts.length){
     list.innerHTML=''; $('listEmpty').style.display='block';
-    $('exportRow').style.display='none'; return;
+    $('exportRow').style.display='none'; $('exportRow2').style.display='none';
+    $('bulkNote').style.display='none'; return;
   }
   $('listEmpty').style.display='none';
   $('exportRow').style.display='flex';
+  $('exportRow2').style.display='flex';
+  $('bulkNote').style.display='block';
   list.innerHTML=contacts.map(c=>{
     const meta=[c.phone,c.email,(c.linkedin||'').replace(/^https?:\/\//,'')].filter(Boolean).join(' · ');
     return `<div class="contact">
@@ -1057,10 +1090,29 @@ async function delOne(id){
   contacts=contacts.filter(x=>x.id!==id);
   await store.set('contacts',contacts); renderContacts();
 }
+function allVcf(){
+  return contacts.map(c=> c.raw && /BEGIN:VCARD/i.test(c.raw)?c.raw:buildVCard({first:c.first||c.name,last:c.last,role:c.role,org:c.org,phone:c.phone,email:c.email,linkedin:c.linkedin}) ).join('\r\n');
+}
 function exportAll(){
-  const all=contacts.map(c=> c.raw && /BEGIN:VCARD/i.test(c.raw)?c.raw:buildVCard({first:c.first||c.name,last:c.last,role:c.role,org:c.org,phone:c.phone,email:c.email,linkedin:c.linkedin}) ).join('\r\n');
-  downloadBlob(all,`contacts_${EVENT.tag.replace(/\s+/g,'_')}.vcf`,'text/vcard');
+  downloadBlob(allVcf(),`contacts_${EVENT.tag.replace(/\s+/g,'_')}.vcf`,'text/vcard');
   toast('Tous les contacts exportés');
+}
+async function saveAllToPhone(){
+  const vcf=allVcf();
+  const fname=`contacts_${EVENT.tag.replace(/\s+/g,'_')}.vcf`;
+  const file=new File([vcf],fname,{type:'text/vcard'});
+  // 1) menu de partage natif : Android → Contacts / Gmail, iPhone → Contacts
+  try{
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:`Contacts ${EVENT.tag}`});
+      return;
+    }
+  }catch(e){ if(e && e.name==='AbortError') return; }
+  // 2) repli : téléchargement + mode d'emploi selon la plateforme
+  downloadBlob(vcf,fname,'text/vcard');
+  toast(isIOS
+    ? 'Fichier téléchargé — ouvre-le puis « Partager → Contacts » pour tout importer'
+    : 'Fichier téléchargé — ouvre-le : Contacts (Gmail) importe tout d\'un coup');
 }
 
 /* ---- agenda / programme ---- */
@@ -1183,13 +1235,10 @@ function exportAgenda(){
 /* ---- réception d'une carte via lien QR (#c=...) ---- */
 let pendingReceive=null;
 function checkIncoming(){
-  const m=location.hash.match(/#c=([A-Za-z0-9\-_]+)/);
-  if(!m) return;
+  if(!/#(p|c)=/.test(location.hash)) return;
+  const c=decodeShareLink(location.hash);
   history.replaceState(null,'',location.pathname+location.search);
-  let vcf; try{ vcf=b64urlDecode(m[1]); }catch(e){ return; }
-  if(!/BEGIN:VCARD/i.test(vcf)) return;
-  const c=parseVCard(vcf);
-  if(!c.name) c.name='Contact';
+  if(!c) return;
   pendingReceive=c;
   $('rcAv').textContent=initials(c.name);
   $('rcName').textContent=c.name;
