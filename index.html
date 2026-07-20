@@ -107,6 +107,9 @@ header{padding:22px 2px 12px;}
 .reticle i.tr{top:0;right:0;border-left:0;border-bottom:0;}
 .reticle i.bl{bottom:0;left:0;border-right:0;border-top:0;}
 #qr img,#qr canvas{display:block;width:100%!important;height:100%!important;}
+.qr-fallback{font-family:'Space Mono';font-size:10px;line-height:1.5;color:#8a8574;
+  text-align:center;padding:14px;display:flex;align-items:center;justify-content:center;
+  height:100%;}
 .qr-hint{text-align:center;font-family:'Space Mono';font-size:10.5px;
   color:#8a8574;letter-spacing:.04em;margin-top:8px;}
 
@@ -631,11 +634,25 @@ const PROGRAM = {
 };
 /* =========================================================================== */
 
-/* ---- stockage persistant (compatible artifact + fallback mémoire) ---- */
+/* ---- stockage persistant : localStorage (app installée/hébergée) →
+       window.storage (aperçu claude.ai) → mémoire (dernier recours) ---- */
 const mem = {};
+const SKEY = 'siateg:';
+function lsGet(k){ try{ const v=localStorage.getItem(SKEY+k); return v==null?undefined:JSON.parse(v); }catch(e){ return undefined; } }
+function lsSet(k,v){ try{ localStorage.setItem(SKEY+k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 const store = {
-  async get(k){ try{ const r = await window.storage.get(k); return r ? JSON.parse(r.value) : null; }catch(e){ return (k in mem)? mem[k] : null; } },
-  async set(k,v){ mem[k]=v; try{ await window.storage.set(k, JSON.stringify(v)); }catch(e){} }
+  async get(k){
+    const v=lsGet(k); if(v!==undefined) return v;                 // 1) localStorage
+    try{ if(window.storage && window.storage.get){                // 2) aperçu claude.ai
+      const r=await window.storage.get(k); if(r) return JSON.parse(r.value);
+    } }catch(e){}
+    return (k in mem)? mem[k] : null;                             // 3) mémoire
+  },
+  async set(k,v){
+    mem[k]=v;
+    lsSet(k,v);
+    try{ if(window.storage && window.storage.set) await window.storage.set(k, JSON.stringify(v)); }catch(e){}
+  }
 };
 
 let profile = null;
@@ -726,8 +743,13 @@ function renderCard(){
   $('dDetails').style.display = rows.length?'flex':'none';
 
   const box=$('qr'); box.innerHTML='';
-  new QRCode(box,{ text:buildVCard(profile), width:178, height:178,
-    colorDark:'#141a24', colorLight:'#F4F2EA', correctLevel:QRCode.CorrectLevel.M });
+  try{
+    if(typeof QRCode==='undefined') throw new Error('QRCode non chargé');
+    new QRCode(box,{ text:buildVCard(profile), width:178, height:178,
+      colorDark:'#141a24', colorLight:'#F4F2EA', correctLevel:QRCode.CorrectLevel.M });
+  }catch(e){
+    box.innerHTML='<div class="qr-fallback">QR momentanément indisponible.<br>Connecte-toi à Internet une fois puis rouvre l\'app : il s\'affichera ensuite, même hors-ligne.</div>';
+  }
 }
 function det(icon,txt){
   return `<div class="det"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>${txt}</div>`;
