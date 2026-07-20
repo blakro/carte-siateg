@@ -12,9 +12,9 @@
 <meta name="apple-mobile-web-app-title" content="Carte SIATeG">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="icon" type="image/png" href="./icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<script src="./vendor/qrcode.min.js"></script>
+<script src="./vendor/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js" defer></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
 
@@ -743,13 +743,14 @@ function renderCard(){
   $('dDetails').style.display = rows.length?'flex':'none';
 
   const box=$('qr'); box.innerHTML='';
-  try{
-    if(typeof QRCode==='undefined') throw new Error('QRCode non chargé');
-    new QRCode(box,{ text:buildVCard(profile), width:178, height:178,
-      colorDark:'#141a24', colorLight:'#F4F2EA', correctLevel:QRCode.CorrectLevel.M });
-  }catch(e){
-    box.innerHTML='<div class="qr-fallback">QR momentanément indisponible.<br>Connecte-toi à Internet une fois puis rouvre l\'app : il s\'affichera ensuite, même hors-ligne.</div>';
-  }
+  const qrFail=()=>{ box.innerHTML='<div class="qr-fallback">QR indisponible sur cet appareil.<br>Utilise « Partager » pour envoyer ta carte.</div>'; };
+  if(typeof QRCodeLib==='undefined'){ qrFail(); return; }
+  const cv=document.createElement('canvas');
+  QRCodeLib.toCanvas(cv, buildVCard(profile),
+    { width:178, margin:1, errorCorrectionLevel:'M',
+      color:{ dark:'#141a24', light:'#F4F2EA' } })
+    .then(()=>box.appendChild(cv))
+    .catch(qrFail);
 }
 function det(icon,txt){
   return `<div class="det"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>${txt}</div>`;
@@ -1130,21 +1131,27 @@ window.addEventListener('pagehide',stopScanner);
 /* ---- installation PWA ---- */
 let deferredPrompt=null;
 const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
-const isStandalone=window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+const isStandalone=['standalone','fullscreen','minimal-ui'].some(m=>window.matchMedia(`(display-mode: ${m})`).matches)
+  || window.navigator.standalone===true
+  || document.referrer.startsWith('android-app://');
+const wasInstalled=()=>lsGet('installed')===true;
+function markInstalled(){ lsSet('installed',true); $('installBtn').hidden=true; deferredPrompt=null; }
 
-function showInstall(){ if(!isStandalone) $('installBtn').hidden=false; }
+function showInstall(){ if(!isStandalone && !wasInstalled()) $('installBtn').hidden=false; }
 
 window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; showInstall(); });
-window.addEventListener('appinstalled',()=>{ $('installBtn').hidden=true; deferredPrompt=null; toast('App installée !'); });
+window.addEventListener('appinstalled',()=>{ markInstalled(); toast('App installée !'); });
 
 // iPhone : pas d'event d'install → on montre le bouton qui ouvre les instructions
-if(isIOS && !isStandalone) showInstall();
+if(isIOS && !isStandalone && !wasInstalled()) showInstall();
+// app déjà installée et (re)lancée depuis l'icône → on mémorise pour les ouvertures en navigateur
+if(isStandalone) lsSet('installed',true);
 
 async function doInstall(){
   if(deferredPrompt){
     deferredPrompt.prompt();
     const {outcome}=await deferredPrompt.userChoice;
-    if(outcome==='accepted'){ $('installBtn').hidden=true; }
+    if(outcome==='accepted') markInstalled();
     deferredPrompt=null;
     return;
   }
