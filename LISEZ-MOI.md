@@ -1,8 +1,17 @@
-# Carte SIATeG — application web installable
+# 📇 Carte SIATeG — ta carte de visite numérique pour le forum
 
-Carte de visite numérique pour le forum : partage ton contact par QR code (vCard),
-scanne les cartes papier (OCR embarqué), garde ton carnet de contacts. Tout fonctionne
-dans le navigateur, sur le téléphone, sans serveur et gratuitement.
+**Fini les piles de cartes papier qu'on perd.** Un QR code, un scan, et le tour est joué :
+ton contact (et le sien) est enregistré, en 2 secondes, sans rien installer.
+
+- 📱 **Ta carte** — nom, poste, téléphone, email, LinkedIn, GitHub, en un QR à montrer
+- 🤝 **Échange instantané** — scanne le QR d'un autre participant, il apparaît dans ton carnet
+- 📸 **Carte papier ? Pas de souci** — prends-la en photo, l'app lit le texte toute seule
+- 🗓️ **Le programme du forum** — toujours sous la main, avec tes sessions favorites
+- 🔒 **100 % privé** — tout reste sur ton téléphone, rien n'est envoyé sur un serveur
+- 🆓 **Gratuit, sans compte, sans pub** — juste un lien à ouvrir
+
+Ça fonctionne dans le navigateur du téléphone, s'installe comme une vraie appli
+(icône sur l'écran d'accueil), et marche même sans connexion une fois ouverte.
 
 ## Contenu du dossier
 - `index.html` — l'application
