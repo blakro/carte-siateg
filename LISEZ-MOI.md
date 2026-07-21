@@ -87,6 +87,8 @@ Le champ `date` (format `AAAA-MM-JJ`) sert au statut « en cours » et aux fichi
 
 ## Notes techniques
 - Données (profil + contacts) stockées localement sur l'appareil.
-- OCR : moteur Tesseract chargé au premier scan (quelques Mo), puis mis en cache.
+- OCR : moteur Tesseract **auto-hébergé** dans `vendor/tesseract/` (aucun CDN).
+  Le cœur (WASM) et le modèle français sont téléchargés au premier scan de carte
+  papier (~10 Mo, une seule fois), puis mis en cache pour marcher hors-ligne.
 - Le partage de contact par QR marche pour tout le monde : celui qui scanne n'a
   besoin d'aucune app, juste de l'appareil photo de son téléphone.

@@ -1,13 +1,15 @@
 /* Carte SIATeG — service worker
    Précache le "shell" de l'app pour un lancement hors-ligne,
    et met en cache à la volée les ressources externes (polices, libs, moteur OCR). */
-const CACHE = 'carte-forum-v2';   // v2 : purge les anciens caches (réponses CDN erronées incluses)
+const CACHE = 'carte-forum-v3';   // v3 : OCR auto-hébergé (plus de CDN)
 const SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './vendor/qrcode.min.js',
   './vendor/jsQR.js',
+  './vendor/tesseract/tesseract.min.js',   // entrée OCR (léger) ; cœur WASM + langue = cache à la volée
+  './vendor/tesseract/worker.min.js',
   './icon-192.png',
   './icon-512.png',
   './icon-512-maskable.png',
