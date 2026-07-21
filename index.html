@@ -33,7 +33,7 @@
   --grid:rgba(255,76,1,.10);
   --ok:#4ADE80;
   --danger:#F87171;
-  --fs:1;               /* multiplicateur global de la taille du texte */
+  --fs:1.18;            /* multiplicateur global du texte (défaut : Grand) */
   --nav-bg:rgba(10,16,25,.86);
   --who:#aeb9cb;
   --place:#8ab4ff;
@@ -110,6 +110,13 @@ header{padding:22px 2px 12px;}
 .view{display:none;flex:1;animation:rise .35s ease both;}
 .view.active{display:flex;flex-direction:column;}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* retour à la carte après actualisation : entrée nette + rebond de l'onglet */
+@keyframes returnPop{0%{opacity:0;transform:translateY(18px) scale(.97)}
+  55%{opacity:1}100%{opacity:1;transform:none}}
+#cardFace.just-returned{animation:returnPop .55s cubic-bezier(.2,.85,.25,1) both}
+@keyframes tabBounce{0%,100%{transform:none}35%{transform:translateY(-4px) scale(1.12)}}
+.tab.returned svg{animation:tabBounce .6s ease}
 
 .eyebrow{font-family:'Space Mono';font-size:calc(10.5px * var(--fs));letter-spacing:.16em;
   text-transform:uppercase;color:var(--muted);margin:6px 2px 12px;}
@@ -1487,28 +1494,44 @@ async function receiveCreate(){
 }
 function receiveClose(){ $('receive').classList.remove('show'); pendingReceive=null; }
 
+/* ---- retour à la carte (actualisation) : rendre le retour évident ---- */
+function announceCard(){
+  const c=$('cardFace');
+  if(c && !c.classList.contains('hidden')){
+    c.classList.remove('just-returned'); void c.offsetWidth; c.classList.add('just-returned');
+  }
+  const tab=document.querySelector('.tab[data-tab="card"]');
+  if(tab){ tab.classList.remove('returned'); void tab.offsetWidth; tab.classList.add('returned'); }
+  toast('↩︎ Ta carte de visite');
+}
+
 /* ---- init ---- */
 (async function(){
   profile=await store.get('profile');
   contacts=await store.get('contacts')||[];
   renderCard();
+  const hadIncoming=/#(p|c)=/.test(location.hash);
   checkIncoming();
+  // si on a une carte et qu'on n'est pas en train de recevoir un contact,
+  // on signale visiblement l'arrivée sur la carte (sinon ça ressemble à un bug)
+  if(!hadIncoming && profile && (profile.first||profile.last)){
+    setTimeout(announceCard,120);
+  }
 })();
 window.addEventListener('pagehide',stopScanner);
 
 /* ---- taille du texte (lisibilité à distance) ---- */
 const FS_LEVELS=[
-  {k:'normal', v:1,    l:'A',   n:'Normal'},
-  {k:'grand',  v:1.18, l:'A+',  n:'Grand'},
-  {k:'xl',     v:1.35, l:'A++', n:'Très grand'}
+  {k:'grand',  v:1.18, l:'A',  n:'Grand'},
+  {k:'xl',     v:1.35, l:'A+', n:'Très grand'}
 ];
 function applyFs(){
-  const f=FS_LEVELS.find(x=>x.k===(lsGet('fs')||'normal'))||FS_LEVELS[0];
+  const f=FS_LEVELS.find(x=>x.k===lsGet('fs'))||FS_LEVELS[0]; // défaut = Grand
   document.documentElement.style.setProperty('--fs',f.v);
   $('fsLabel').textContent=f.l;
 }
 function cycleFs(){
-  const cur=lsGet('fs')||'normal';
+  const cur=lsGet('fs')||'grand';
   const i=FS_LEVELS.findIndex(x=>x.k===cur);
   const next=FS_LEVELS[(i+1)%FS_LEVELS.length];
   lsSet('fs',next.k); applyFs();
