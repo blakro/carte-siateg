@@ -234,6 +234,7 @@ header{padding:22px 2px 12px;}
 .mini.warn{color:var(--danger);}
 .count{font-family:'Space Mono';font-size:calc(11px * var(--fs));color:var(--muted);
   margin-left:auto;align-self:center;}
+.list-spacer{flex:1 1 auto;min-height:0;}
 .section-head{display:flex;align-items:center;margin:6px 2px 14px;}
 .section-head .eyebrow{margin:0;}
 
@@ -560,6 +561,9 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 
   <!-- ===== CONTACTS ===== -->
   <section class="view" id="v-list">
+    <!-- pousse le bloc vers le bas (zone du pouce) quand il y a peu de contacts ;
+         se réduit à 0 dès que ça dépasse → défilement normal -->
+    <div class="list-spacer"></div>
     <div class="section-head">
       <div class="eyebrow">Contacts du forum</div>
       <span class="count" id="cCount">0</span>
