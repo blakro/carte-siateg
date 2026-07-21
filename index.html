@@ -100,8 +100,12 @@ header{padding:22px 2px 12px;}
 .brand{display:flex;align-items:baseline;gap:9px;}
 .brand b{font-family:'Space Grotesk';font-weight:700;font-size:calc(20px * var(--fs));letter-spacing:-.02em;}
 .brand span{color:var(--accent);font-family:'Space Grotesk';font-weight:700;}
-.coords{font-family:'Space Mono';font-size:calc(11px * var(--fs));color:var(--muted);
-  margin-top:5px;display:flex;align-items:center;gap:7px;letter-spacing:.02em;}
+.venue-link{margin-top:6px;display:inline-flex;align-items:center;gap:7px;
+  background:transparent;border:0;padding:2px 0;cursor:pointer;
+  font-family:'Space Mono';font-size:calc(11px * var(--fs));color:var(--accent-strong);
+  letter-spacing:.02em;transition:opacity .12s;}
+.venue-link:active{opacity:.6;}
+.venue-link svg{color:var(--accent);}
 .ping{width:6px;height:6px;border-radius:50%;background:var(--accent);
   box-shadow:0 0 0 0 rgba(255,76,1,.6);animation:ping 2.4s ease-out infinite;}
 @keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,76,1,.5)}70%{box-shadow:0 0 0 7px rgba(255,76,1,0)}100%{box-shadow:0 0 0 0 rgba(255,76,1,0)}}
@@ -336,13 +340,6 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   border:1px solid var(--line);}
 
 /* ===== agenda / programme ===== */
-.prog-banner{background:var(--surface);border:1px solid var(--line);border-radius:14px;
-  padding:12px 15px;margin:2px 2px 16px;display:flex;align-items:center;gap:11px;}
-.prog-banner .pb-ico{flex:none;width:34px;height:34px;border-radius:10px;
-  background:linear-gradient(135deg,var(--accent),var(--accent-soft));
-  display:flex;align-items:center;justify-content:center;color:#fff;}
-.prog-banner .pb-t{font-family:'Space Grotesk';font-weight:600;font-size:calc(14px * var(--fs));}
-.prog-banner .pb-s{font-family:'Space Mono';font-size:calc(11px * var(--fs));color:var(--muted);margin-top:2px;}
 
 .day-head{display:flex;align-items:center;gap:10px;margin:4px 2px 14px;
   font-family:'Space Mono';font-size:calc(11px * var(--fs));letter-spacing:.12em;text-transform:uppercase;color:var(--accent-strong);}
@@ -472,7 +469,11 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
     <div class="head-row">
       <div>
         <div class="brand"><b>SIA<span>TeG</span></b> <span style="color:var(--muted);font-family:'Space Mono';font-size:calc(11px * var(--fs));font-weight:400;letter-spacing:.05em;">/ carte</span></div>
-        <div class="coords"><span class="ping"></span>13.5116° N · 2.1254° E — Niamey · 23–24 JUL 2026</div>
+        <button class="venue-link" onclick="openVenueMap()" title="Ouvrir le lieu dans Google Maps (satellite)">
+          <span class="ping"></span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Voir le lieu · vue satellite
+        </button>
       </div>
       <div class="head-actions">
         <button id="fsBtn" class="theme-chip" onclick="cycleFs()" title="Taille du texte">
@@ -607,16 +608,6 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   <section class="view" id="v-prog">
     <div class="eyebrow">Programme du forum</div>
 
-    <div class="prog-banner">
-      <div class="pb-ico">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
-      </div>
-      <div>
-        <div class="pb-t" id="progWhen">—</div>
-        <div class="pb-s" id="progNow">—</div>
-      </div>
-    </div>
-
     <div id="progBody"></div>
 
     <div class="row">
@@ -730,7 +721,9 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 const EVENT = {
   name: "Rencontré à SIATeG 2026 — Niamey",
   tag: "SIATeG 2026",
-  place: "Centre de Conférence Mahatma Gandhi, Niamey"
+  place: "Centre de Conférence Mahatma Gandhi, Niamey",
+  lat: 13.5116,   // coordonnées du lieu (ajuste si besoin) — ouvre Google Maps en vue satellite
+  lng: 2.1254
 };
 
 /* ============ PROGRAMME (change ceci pour un autre forum) =================== */
@@ -873,6 +866,16 @@ function beep(freqs,dur){
 }
 function scanFeedback(){ haptic([35,45,35]); beep([880,1320],.2); }   // "bip-bip" ascendant + vibration
 function tapFeedback(){ haptic(15); beep([1400],.06); }               // clic léger (étoile)
+
+/* ---- lieu de l'événement → Google Maps en vue satellite ---- */
+function openVenueMap(){
+  const {lat,lng,place}=EVENT;
+  // repère aux coordonnées + basemap satellite (data=!3m1!1e3)
+  const url=(lat!=null&&lng!=null)
+    ? `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},18z/data=!3m1!1e3`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place||'')}`;
+  window.open(url,'_blank','noopener');
+}
 function normUrl(u){ if(!u) return ''; u=u.trim(); return /^https?:\/\//i.test(u)?u:'https://'+u; }
 function escapeVcf(s){ return (s||'').replace(/([;,\\])/g,'\\$1').replace(/\n/g,'\\n'); }
 function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
@@ -1340,21 +1343,7 @@ function statusOf(now){
 function renderProgram(){
   const now=new Date();
   const {map,nextKey,anyNow}=statusOf(now);
-
-  // bandeau
   const days=PROGRAM.days;
-  $('progWhen').textContent=`${EVENT.tag} · ${EVENT.place||''}`.trim();
-  const firstStart=slotDate(days[0].date,days[0].sessions[0].start);
-  if(now<firstStart){
-    const dd=Math.ceil((firstStart-now)/86400000);
-    $('progNow').textContent = dd>1 ? `Ouverture dans ${dd} jours` : `Le forum ouvre bientôt`;
-  } else {
-    const active=[];
-    days.forEach(d=>d.sessions.forEach(s=>{
-      if(now>=slotDate(d.date,s.start)&&now<=slotDate(d.date,s.end)&&!s.brk) active.push(s.title);
-    }));
-    $('progNow').textContent = active.length ? 'En cours : '+active[0] : 'Programme du jour';
-  }
 
   const svgCal='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M12 13v4M10 15h4"/></svg>';
 
