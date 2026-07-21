@@ -1182,18 +1182,48 @@ async function getOcrWorker(onLog){
   await w.setParameters({tessedit_pageseg_mode:'3'});   // PSM 3 (auto) — le plus fiable sur les cartes
   ocrWorker=w; ocrWorker._log=onLog; return ocrWorker;
 }
-// lit la carte en essayant image brute puis N&B, garde le meilleur résultat
+// lit la carte via image brute + N&B ; renvoie les textes + le meilleur score
 async function recognizeCard(canvas,onLog){
   const worker=await getOcrWorker(onLog);
-  let best='', bestQ=-1;
+  const texts=[]; let bestQ=-1;
   const variants=[canvas, otsuCanvas(canvas)];
   for(let i=0;i<variants.length;i++){
     let txt=''; try{ txt=(await worker.recognize(variants[i])).data.text||''; }catch(e){ txt=''; }
-    const q=ocrQuality(txt);
-    if(q>bestQ){ bestQ=q; best=txt; }
-    if(bestQ>=9) break;   // déjà bon (email + téléphone + du texte) → inutile de continuer
+    texts.push(txt); bestQ=Math.max(bestQ, ocrQuality(txt));
+    if(bestQ>=11 && i===0) break;   // 1er essai déjà excellent → inutile de continuer
   }
-  return best;
+  return {texts, bestQ};
+}
+// plausibilité d'un nom (pour choisir entre variantes)
+function scoreName(n){
+  if(!n) return -1e6;
+  const toks=n.trim().split(/\s+/); if(toks.length<1||toks.length>5) return -1e6;
+  let s=0;
+  for(const t of toks){
+    if(/^[A-Za-zÀ-ÿ]{2,}$/.test(t)) s+=2;                 // vrai mot
+    else if(/^[A-Za-zÀ-ÿ]\.?$/.test(t)) s+=1;             // initiale
+    else s-=2;                                            // token bizarre
+  }
+  if(/[,;:>|/\\{}\[\]]/.test(n)) s-=4;                    // ponctuation = bruit OCR
+  if(/\d/.test(n)) s-=3;
+  return s;
+}
+// fusionne les champs des différentes lectures : meilleur nom, meilleur téléphone, etc.
+function mergeParsed(list){
+  list=list.filter(Boolean); if(!list.length) return {};
+  const pick=(k,sc)=>{ let v='',b=-1e9; for(const p of list){ const x=p[k]; if(!x) continue;
+    const s=sc?sc(x):(''+x).length; if(s>b){b=s;v=x;} } return v; };
+  const out={};
+  out.email=pick('email',v=>/@/.test(v)?v.length:-1);
+  out.linkedin=pick('linkedin');
+  out.phone=pick('phone',v=>{ const d=(v.match(/\d/g)||[]).length; return d>=8?d:-1; });
+  out.role=pick('role',v=>/(manager|director|analyst|analyste|ing[eé]nieur|consultant|responsable|chef|lead|founder|ceo|cto|commercial|g[eé]rant|assistant|officer|expert|designer|developer|d[eé]veloppeur)/i.test(v)?100+v.length:v.length);
+  out.org=pick('org',v=>/(sarl|s\.?a\.?|ltd|inc|trading|technolog|solutions|services|group|telecom|bank|banque|universit|institut|agence|company)/i.test(v)?100+v.length:v.length);
+  let bn=-1e9;
+  for(const p of list){ const full=((p.first||'')+' '+(p.last||'')).trim(); const s=scoreName(full);
+    if(s>bn){ bn=s; out.first=p.first||''; out.last=p.last||''; } }
+  out._nameOk = bn>=3;   // nom jugé plausible ?
+  return out;
 }
 async function scanPaperCard(ev){
   const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
@@ -1211,15 +1241,21 @@ async function scanPaperCard(ev){
     // 2) essaie image brute + noir & blanc, garde le meilleur résultat (Tesseract est
     //    instable sur les photos réelles : cette approche fiabilise la lecture)
     const canvas=await prepImageForOCR(lastCardUrl);
-    const text=await recognizeCard(canvas, m=>{
+    const {texts,bestQ}=await recognizeCard(canvas, m=>{
       if(m.status==='recognizing text'){
         const p=Math.round(m.progress*100);
         $('ocrFill').style.width=p+'%'; $('ocrPct').textContent=p+' %';
       } else if(m.status){ $('ocrPct').textContent='Préparation…'; }
     });
     ov.classList.remove('show');
-    const parsed=parseCardText(text||'');
-    openReview(parsed, lastCardUrl);
+    if(bestQ<4){   // lecture clairement ratée (photo floue / reflet / de biais)
+      openReview({}, lastCardUrl);
+      toast('Lecture difficile — reprends la photo bien à plat, sans reflet');
+    } else {
+      const parsed=mergeParsed(texts.map(parseCardText));
+      if(parsed._nameOk===false){ parsed.first=''; parsed.last=''; }   // évite un nom en charabia
+      openReview(parsed, lastCardUrl);
+    }
   }catch(e){
     ov.classList.remove('show');
     // échec moteur : on ouvre quand même la fiche vide pour saisie manuelle
