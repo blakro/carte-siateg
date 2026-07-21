@@ -192,6 +192,8 @@ header{padding:22px 2px 12px;}
 .btn.primary{background:var(--accent);color:#fff;}
 .btn.primary:hover{filter:brightness(1.08);}
 .btn.ghost{background:var(--surface-2);color:var(--ink);}
+.btn.wa{background:#25D366;color:#0a2e18;}
+.btn.wa:hover{filter:brightness(1.06);}
 .btn svg{flex:none;}
 
 /* form */
@@ -469,8 +471,8 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   box-shadow:inset 0 -8px 20px -12px rgba(0,0,0,.7);
   padding-top:env(safe-area-inset-top);}
 #splashCv{width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;display:block;}
-.splash-cap{position:absolute;right:12px;bottom:8px;font-family:'Space Mono';
-  font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#b9a487;
+.splash-cap{position:absolute;left:12px;bottom:8px;font-family:'Space Mono';
+  font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#f0d9b8;
   animation:capBlink 1.1s steps(2) infinite;pointer-events:none;}
 @keyframes capBlink{0%,100%{opacity:.5}50%{opacity:1}}
 
@@ -535,8 +537,8 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
     </div>
 
     <div class="row" id="cardActions" style="display:none">
-      <button class="btn primary" onclick="shareCard()">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+      <button class="btn wa" onclick="shareWhatsApp()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
         Partager</button>
       <button class="btn ghost" onclick="go('edit')">Modifier</button>
     </div>
@@ -731,7 +733,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 <!-- bandeau pixel animé (girafe dans la savane) au retour sur la carte -->
 <div class="splash" id="splash">
   <canvas id="splashCv" width="260" height="56"></canvas>
-  <div class="splash-cap">SIATeG · ta carte</div>
+  <div class="splash-cap">← vers ta carte</div>
 </div>
 
 <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
@@ -1035,21 +1037,20 @@ function det(icon,txt,href,color,filled){
   return `<a class="det det-link" href="${href}" target="_blank" rel="noopener"${st}>${inner}</a>`;
 }
 
-/* ---- partage ---- */
-async function shareCard(){
-  const vcf=buildVCard(profile);
-  const fullName=`${profile.first||''} ${profile.last||''}`.trim()||'contact';
-  const fn=fullName.replace(/\s+/g,'_')+'.vcf';
-  const file=new File([vcf],fn,{type:'text/vcard'});
-  try{
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:`Carte de ${fullName} — ${EVENT.tag}`});
-      return;
-    }
-  }catch(e){ if(e && e.name==='AbortError') return; }
-  // fallback : téléchargement du .vcf
-  downloadBlob(vcf,fn,'text/vcard');
-  toast('Carte .vcf téléchargée');
+/* ---- partage WhatsApp ---- */
+function shareWhatsApp(){
+  const p=profile; if(!p||(!p.first&&!p.last)) return;
+  const fn=`${p.first||''} ${p.last||''}`.trim();
+  const url=appUrl();
+  const link=url ? url+'#p='+packProfile(p) : '';
+  const L=[`📇 *${fn}* — ${EVENT.tag}`];
+  const sub=[p.role,p.org].filter(Boolean).join(', '); if(sub) L.push(sub);
+  if(p.phone)    L.push(`📞 ${p.phone}`);
+  if(p.email)    L.push(`✉️ ${p.email}`);
+  if(p.linkedin) L.push(`💼 ${normUrl(p.linkedin)}`);
+  if(p.github)   L.push(`🐙 ${normUrl(p.github)}`);
+  if(link) L.push(`\n👉 Ma carte + l'app SIATeG : ${link}`);
+  window.open('https://wa.me/?text='+encodeURIComponent(L.join('\n')),'_blank','noopener');
 }
 function downloadBlob(content,filename,type){
   const b=new Blob([content],{type}); const u=URL.createObjectURL(b);
@@ -1637,42 +1638,42 @@ function drawGiraffeScene(ctx,W,H,t){
   // soleil pixel (bloc avec coins mangés)
   const sx=Math.round(W*0.12),sy=Math.round(H*0.18);
   px(sx,sy,8,8,'#FF9A5B'); px(sx-1,sy+2,1,4,'#FF9A5B'); px(sx+8,sy+2,1,4,'#FF9A5B'); px(sx+2,sy-1,4,1,'#FF9A5B'); px(sx+2,sy+8,4,1,'#FF9A5B');
-  // collines de fond (défilent lentement)
-  const ob=(t*0.35)%(W+70);
+  // collines de fond (défilent vers la DROITE → girafe va vers la gauche)
+  const ob=(t*0.35)%70;
   ctx.fillStyle='#3a2a19';
-  for(let k=-1;k<Math.ceil(W/70)+2;k++){ const bx=k*70-ob; ctx.fillRect(bx,gY-8,34,8); ctx.fillRect(bx+8,gY-12,18,12); }
+  for(let k=-1;k<Math.ceil(W/70)+2;k++){ const bx=k*70-70+ob; ctx.fillRect(bx,gY-8,34,8); ctx.fillRect(bx+8,gY-12,18,12); }
   // sol
   px(0,gY,W,H-gY,'#4a3420'); px(0,gY,W,1,'#6b8a3a');
-  // acacias + touffes qui défilent (premier plan)
+  // acacias + touffes (défilent vers la droite)
   const of=(t*1.15)%46;
-  for(let i=-1;i<Math.ceil(W/46)+2;i++){ const x=i*46-of;
+  for(let i=-1;i<Math.ceil(W/46)+2;i++){ const x=i*46-46+of;
     px(x+6,gY-6,2,6,'#5a3f28');                 // tronc
     px(x+1,gY-9,12,3,'#5f7d33'); px(x+3,gY-11,8,2,'#6b8a3a'); // canopée plate acacia
     px(x+24,gY-2,3,2,'#5f7d33');                 // touffe d'herbe
   }
-  // --- girafe (face à droite) qui marche sur place ---
-  const gx=Math.round(W*0.44), fy=gY, bob=(Math.floor(t/6)%2), BODY='#E8A85A', SPOT='#A5652A', DK='#241708';
-  const b=bob; // léger sautillement
+  // flèche vers la gauche (clignote)
+  if(Math.floor(t/10)%2===0){
+    const ax=Math.round(W*0.66), ay=Math.round(H*0.24), AC='#FF8A5B';
+    px(ax-3,ay,12,2,AC);                          // hampe
+    px(ax-5,ay-1,2,4,AC); px(ax-3,ay-3,2,2,AC); px(ax-3,ay+3,2,2,AC);  // pointe "<"
+  }
+  // --- girafe qui court vers la GAUCHE (sprite miroir) ---
+  const gx=Math.round(W*0.44), fy=gY, b=(Math.floor(t/6)%2), BODY='#E8A85A', SPOT='#A5652A', DK='#241708';
+  ctx.save(); ctx.translate(2*gx+17,0); ctx.scale(-1,1);   // miroir horizontal → face à gauche
   // pattes (2 frames)
   const p=Math.floor(t/7)%2;
   const legY=fy-8+b;
   const legs=[gx+1,gx+5,gx+10,gx+14];
   legs.forEach((lx,i)=>{ const up=(i%2===p)?2:0; px(lx,legY,2,8-up,BODY); px(lx,legY+8-up-1,2,1,DK); });
-  // corps
-  px(gx,fy-15+b,15,7,BODY);
-  // taches corps
-  px(gx+2,fy-13+b,3,2,SPOT); px(gx+7,fy-11+b,2,2,SPOT); px(gx+11,fy-14+b,2,2,SPOT);
-  // queue
-  px(gx-1,fy-13+b,1,6,BODY); px(gx-1,fy-8+b,1,2,DK);
-  // cou
-  px(gx+10,fy-27+b,3,12,BODY); px(gx+11,fy-24+b,2,2,SPOT); px(gx+11,fy-20+b,1,2,SPOT);
-  // tête + museau
-  px(gx+9,fy-31+b,6,5,BODY); px(gx+15,fy-29+b,3,3,BODY);
-  // oreille + ossicônes
-  px(gx+8,fy-30+b,1,2,BODY); px(gx+10,fy-34+b,1,3,BODY); px(gx+13,fy-34+b,1,3,BODY);
+  px(gx,fy-15+b,15,7,BODY);                                // corps
+  px(gx+2,fy-13+b,3,2,SPOT); px(gx+7,fy-11+b,2,2,SPOT); px(gx+11,fy-14+b,2,2,SPOT); // taches
+  px(gx-1,fy-13+b,1,6,BODY); px(gx-1,fy-8+b,1,2,DK);       // queue
+  px(gx+10,fy-27+b,3,12,BODY); px(gx+11,fy-24+b,2,2,SPOT); px(gx+11,fy-20+b,1,2,SPOT); // cou
+  px(gx+9,fy-31+b,6,5,BODY); px(gx+15,fy-29+b,3,3,BODY);   // tête + museau
+  px(gx+8,fy-30+b,1,2,BODY); px(gx+10,fy-34+b,1,3,BODY); px(gx+13,fy-34+b,1,3,BODY);  // oreille + ossicônes
   px(gx+10,fy-35+b,1,1,SPOT); px(gx+13,fy-35+b,1,1,SPOT);
-  // œil
-  px(gx+12,fy-30+b,1,1,DK);
+  px(gx+12,fy-30+b,1,1,DK);                                // œil
+  ctx.restore();
 }
 function startPixelScene(){
   const cv=$('splashCv'); if(!cv) return; const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
