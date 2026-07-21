@@ -100,12 +100,11 @@ header{padding:22px 2px 12px;}
 .brand{display:flex;align-items:baseline;gap:9px;}
 .brand b{font-family:'Space Grotesk';font-weight:700;font-size:calc(20px * var(--fs));letter-spacing:-.02em;}
 .brand span{color:var(--accent);font-family:'Space Grotesk';font-weight:700;}
-.venue-link{margin-top:6px;display:inline-flex;align-items:center;gap:7px;
-  background:transparent;border:0;padding:2px 0;cursor:pointer;
-  font-family:'Space Mono';font-size:calc(11px * var(--fs));color:var(--accent-strong);
-  letter-spacing:.02em;transition:opacity .12s;}
-.venue-link:active{opacity:.6;}
-.venue-link svg{color:var(--accent);}
+.brand-sub{color:var(--muted);font-family:'Space Mono';font-size:calc(11px * var(--fs));
+  font-weight:400;letter-spacing:.05em;}
+.carte-link{color:var(--accent-strong);text-decoration:underline;text-underline-offset:3px;
+  text-decoration-thickness:1.5px;cursor:pointer;}
+.carte-link:active{opacity:.6;}
 .ping{width:6px;height:6px;border-radius:50%;background:var(--accent);
   box-shadow:0 0 0 0 rgba(255,76,1,.6);animation:ping 2.4s ease-out infinite;}
 @keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,76,1,.5)}70%{box-shadow:0 0 0 7px rgba(255,76,1,0)}100%{box-shadow:0 0 0 0 rgba(255,76,1,0)}}
@@ -141,6 +140,10 @@ header{padding:22px 2px 12px;}
 .det{display:flex;align-items:center;gap:10px;font-family:'Space Mono';
   font-size:calc(12.5px * var(--fs));color:#333b49;word-break:break-all;}
 .det svg{flex:none;color:var(--accent);}
+.det-link{text-decoration:none;color:inherit;cursor:pointer;}
+.det-link .dt{text-decoration:underline;text-decoration-thickness:1px;
+  text-underline-offset:3px;text-decoration-color:rgba(51,59,73,.4);}
+.det-link:active{opacity:.6;}
 
 /* QR reticle — cadre travaillé (dégradé accent + grille discrète) */
 .reticle{margin:20px auto 6px;width:216px;height:216px;position:relative;
@@ -468,12 +471,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   <header>
     <div class="head-row">
       <div>
-        <div class="brand"><b>SIA<span>TeG</span></b> <span style="color:var(--muted);font-family:'Space Mono';font-size:calc(11px * var(--fs));font-weight:400;letter-spacing:.05em;">/ carte</span></div>
-        <button class="venue-link" onclick="openVenueMap()" title="Ouvrir le lieu dans Google Maps (satellite)">
-          <span class="ping"></span>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          Voir le lieu · vue satellite
-        </button>
+        <div class="brand"><b>SIA<span>TeG</span></b> <span class="brand-sub">/ <a id="carteLink" class="carte-link" target="_blank" rel="noopener" title="Ouvrir le lieu du forum dans Google Maps">carte</a></span></div>
       </div>
       <div class="head-actions">
         <button id="fsBtn" class="theme-chip" onclick="cycleFs()" title="Taille du texte">
@@ -722,8 +720,7 @@ const EVENT = {
   name: "Rencontré à SIATeG 2026 — Niamey",
   tag: "SIATeG 2026",
   place: "Centre de Conférence Mahatma Gandhi, Niamey",
-  lat: 13.5116,   // coordonnées du lieu (ajuste si besoin) — ouvre Google Maps en vue satellite
-  lng: 2.1254
+  mapUrl: "https://maps.app.goo.gl/Gnbf79q9FSHyP9Ym9"   // clic sur « carte » → Google Maps du lieu
 };
 
 /* ============ PROGRAMME (change ceci pour un autre forum) =================== */
@@ -867,15 +864,6 @@ function beep(freqs,dur){
 function scanFeedback(){ haptic([35,45,35]); beep([880,1320],.2); }   // "bip-bip" ascendant + vibration
 function tapFeedback(){ haptic(15); beep([1400],.06); }               // clic léger (étoile)
 
-/* ---- lieu de l'événement → Google Maps en vue satellite ---- */
-function openVenueMap(){
-  const {lat,lng,place}=EVENT;
-  // repère aux coordonnées + basemap satellite (data=!3m1!1e3)
-  const url=(lat!=null&&lng!=null)
-    ? `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},18z/data=!3m1!1e3`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place||'')}`;
-  window.open(url,'_blank','noopener');
-}
 function normUrl(u){ if(!u) return ''; u=u.trim(); return /^https?:\/\//i.test(u)?u:'https://'+u; }
 function escapeVcf(s){ return (s||'').replace(/([;,\\])/g,'\\$1').replace(/\n/g,'\\n'); }
 function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
@@ -978,9 +966,9 @@ function renderCard(){
     link:'<path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>'
   };
   const rows=[];
-  if(profile.phone) rows.push(det(ic.phone,profile.phone));
-  if(profile.email) rows.push(det(ic.email,profile.email));
-  if(profile.linkedin) rows.push(det(ic.link,profile.linkedin.replace(/^https?:\/\//,'')));
+  if(profile.phone) rows.push(det(ic.phone,profile.phone,'tel:'+profile.phone.replace(/\s+/g,'')));
+  if(profile.email) rows.push(det(ic.email,profile.email,'mailto:'+profile.email.trim()));
+  if(profile.linkedin) rows.push(det(ic.link,profile.linkedin.replace(/^https?:\/\//,''),normUrl(profile.linkedin)));
   $('dDetails').innerHTML=rows.join('');
   $('dDetails').style.display = rows.length?'flex':'none';
 
@@ -1008,8 +996,11 @@ function renderCard(){
     .catch(qrFail);
 }
 function setQrMode(m){ lsSet('qrmode',m); renderCard(); }
-function det(icon,txt){
-  return `<div class="det"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>${txt}</div>`;
+function det(icon,txt,href){
+  const inner=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg><span class="dt">${txt}</span>`;
+  return href
+    ? `<a class="det det-link" href="${href}" target="_blank" rel="noopener">${inner}</a>`
+    : `<div class="det">${inner}</div>`;
 }
 
 /* ---- partage ---- */
@@ -1606,6 +1597,7 @@ function announceCard(){
 
 /* ---- init ---- */
 (async function(){
+  const cl=$('carteLink'); if(cl && EVENT.mapUrl) cl.href=EVENT.mapUrl;
   profile=await store.get('profile');
   contacts=await store.get('contacts')||[];
   starred=await store.get('starred')||{};
