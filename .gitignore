@@ -1,0 +1,5 @@
+# fichiers de test / cartes scannées pendant le développement — jamais commités
+card*.jpg
+card*.jpeg
+card*.png
+*.test.jpg
