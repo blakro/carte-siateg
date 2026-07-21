@@ -71,7 +71,7 @@
 }
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html,body{margin:0;padding:0;}
+html,body{margin:0;padding:0;overscroll-behavior-y:contain;}
 body{
   font-family:'Inter',system-ui,sans-serif;
   color:var(--ink);
@@ -102,8 +102,10 @@ header{padding:22px 2px 12px;}
 .brand span{color:var(--accent);font-family:'Space Grotesk';font-weight:700;}
 .brand-sub{color:var(--muted);font-family:'Space Mono';font-size:calc(11px * var(--fs));
   font-weight:400;letter-spacing:.05em;}
-.carte-link{color:var(--accent-strong);text-decoration:underline;text-underline-offset:3px;
-  text-decoration-thickness:1.5px;cursor:pointer;}
+.carte-link{color:var(--accent-strong);text-decoration:none;cursor:pointer;
+  display:inline-flex;align-items:center;gap:2px;}
+.carte-link .cl-t{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px;}
+.carte-link .cl-pin{margin-bottom:1px;}
 .carte-link:active{opacity:.6;}
 .ping{width:6px;height:6px;border-radius:50%;background:var(--accent);
   box-shadow:0 0 0 0 rgba(255,76,1,.6);animation:ping 2.4s ease-out infinite;}
@@ -460,13 +462,12 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 .slot.star .slot-card{box-shadow:inset 0 0 0 1.6px var(--accent), 0 0 0 3px rgba(255,76,1,.08);}
 .time-rail .seg.star{box-shadow:0 0 0 2px var(--ground),0 0 0 3.5px var(--accent);z-index:2;}
 
-/* bandeau pixel en haut (retour à la carte) — caché par défaut, glisse depuis le haut */
-.splash{position:fixed;top:0;left:0;right:0;z-index:60;
+/* bandeau pixel — couche inférieure, révélé en tirant vers le bas (pull-to-refresh) */
+.splash{position:fixed;top:0;left:0;right:0;z-index:0;
   background:linear-gradient(180deg,#181009,#0a0a11);
-  transform:translateY(-105%);transition:transform .5s cubic-bezier(.2,.85,.25,1);
-  box-shadow:0 12px 34px -14px rgba(0,0,0,.85);overflow:hidden;
+  transform:translateY(-100%);overflow:hidden;
+  box-shadow:inset 0 -8px 20px -12px rgba(0,0,0,.7);
   padding-top:env(safe-area-inset-top);}
-.splash.show{transform:translateY(0);}
 #splashCv{width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;display:block;}
 .splash-cap{position:absolute;right:12px;bottom:8px;font-family:'Space Mono';
   font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#b9a487;
@@ -485,7 +486,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   <header>
     <div class="head-row">
       <div>
-        <div class="brand"><b>SIA<span>TeG</span></b> <span class="brand-sub">/ <a id="carteLink" class="carte-link" target="_blank" rel="noopener" title="Voir le lieu du forum en vue satellite">loc📍</a></span></div>
+        <div class="brand"><b>SIA<span>TeG</span></b> <span class="brand-sub">/ <a id="carteLink" class="carte-link" target="_blank" rel="noopener" title="Voir le lieu du forum en vue satellite"><span class="cl-t">loc</span><svg class="cl-pin" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></a></span></div>
       </div>
       <div class="head-actions">
         <button id="fsBtn" class="theme-chip" onclick="cycleFs()" title="Taille du texte">
@@ -554,6 +555,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
       <div class="field"><label>Téléphone</label><input id="f-phone" type="tel" placeholder="+227 90 00 00 00"></div>
       <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="aicha@email.com"></div>
       <div class="field"><label>LinkedIn (lien du profil)</label><input id="f-linkedin" placeholder="linkedin.com/in/aicha"></div>
+      <div class="field"><label>GitHub (lien ou pseudo)</label><input id="f-github" placeholder="github.com/aicha"></div>
       <div class="row">
         <button class="btn ghost" onclick="go('card')">Annuler</button>
         <button class="btn primary" onclick="saveProfile()">Enregistrer</button>
@@ -896,13 +898,13 @@ function b64urlDecode(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.lengt
 function appUrl(){ return /^https?:$/.test(location.protocol) ? location.origin+location.pathname : ''; }
 // format compact (QR moins dense que la vCard complète → scan bien plus fiable)
 function packProfile(p){
-  return b64urlEncode(['1',p.first||'',p.last||'',p.role||'',p.org||'',p.phone||'',p.email||'',p.linkedin||''].join('\n'));
+  return b64urlEncode(['2',p.first||'',p.last||'',p.role||'',p.org||'',p.phone||'',p.email||'',p.linkedin||'',p.github||''].join('\n'));
 }
 function unpackProfile(s){
   let f; try{ f=b64urlDecode(s).split('\n'); }catch(e){ return null; }
-  if(f[0]!=='1') return null;
+  if(f[0]!=='1' && f[0]!=='2') return null;           // v1 (sans github) ou v2 (avec github)
   const p={ first:f[1]||'', last:f[2]||'', role:f[3]||'', org:f[4]||'',
-            phone:f[5]||'', email:f[6]||'', linkedin:f[7]||'' };
+            phone:f[5]||'', email:f[6]||'', linkedin:f[7]||'', github:f[8]||'' };
   p.name=`${p.first} ${p.last}`.trim();
   p.raw=buildVCard(p);
   return p.name?p:null;
@@ -929,6 +931,8 @@ function buildVCard(p){
   if(p.phone) L.push(`TEL;TYPE=CELL:${p.phone.trim()}`);
   if(p.email) L.push(`EMAIL;TYPE=INTERNET:${p.email.trim()}`);
   if(p.linkedin) L.push(`URL:${normUrl(p.linkedin)}`);
+  if(p.github) L.push(`URL:${normUrl(p.github)}`);
+  if(p.github) L.push(`X-SOCIALPROFILE;TYPE=github:${normUrl(p.github)}`);
   L.push(`NOTE:${escapeVcf(EVENT.name)}`);
   L.push('END:VCARD');
   return L.join('\r\n');
@@ -954,13 +958,13 @@ function fillForm(){
   $('f-first').value=p.first||''; $('f-last').value=p.last||'';
   $('f-role').value=p.role||''; $('f-org').value=p.org||'';
   $('f-phone').value=p.phone||''; $('f-email').value=p.email||'';
-  $('f-linkedin').value=p.linkedin||'';
+  $('f-linkedin').value=p.linkedin||''; $('f-github').value=p.github||'';
 }
 async function saveProfile(){
   const p={ first:$('f-first').value.trim(), last:$('f-last').value.trim(),
     role:$('f-role').value.trim(), org:$('f-org').value.trim(),
     phone:$('f-phone').value.trim(), email:$('f-email').value.trim(),
-    linkedin:$('f-linkedin').value.trim() };
+    linkedin:$('f-linkedin').value.trim(), github:$('f-github').value.trim() };
   if(!p.first && !p.last){ toast('Ajoute au moins ton nom'); return; }
   profile=p; await store.set('profile',p);
   renderCard(); go('card'); toast('Carte enregistrée');
@@ -985,12 +989,15 @@ function renderCard(){
   const ic={
     phone:'<path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012 4.2 2 2 0 014 2h3a2 2 0 012 1.7c.1.9.3 1.8.6 2.6a2 2 0 01-.5 2.1L8 9.6a16 16 0 006 6l1.2-1.1a2 2 0 012.1-.5c.8.3 1.7.5 2.6.6a2 2 0 011.7 2z"/>',
     email:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
-    link:'<path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>'
+    // vraies icônes de marque (glyphes pleins)
+    linkedin:'<path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.47-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 110-4.13 2.06 2.06 0 010 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/>',
+    github:'<path d="M12 .3a12 12 0 00-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2 0 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1 0-.4-.6-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 016 0C17.3 4.7 18.3 5 18.3 5c.7 1.6.1 2.8 0 3.2.9.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1.1.9 2.3v3.3c0 .3.2.7.8.6A12 12 0 0012 .3z"/>'
   };
   const rows=[];
   if(profile.phone) rows.push(det(ic.phone,profile.phone,'tel:'+profile.phone.replace(/\s+/g,''),'#15803D'));      // vert
   if(profile.email) rows.push(det(ic.email,profile.email,'mailto:'+profile.email.trim(),'#7C3AED'));                 // violet
-  if(profile.linkedin) rows.push(det(ic.link,profile.linkedin.replace(/^https?:\/\//,''),normUrl(profile.linkedin),'#0A66C2'));  // bleu LinkedIn
+  if(profile.linkedin) rows.push(det(ic.linkedin,profile.linkedin.replace(/^https?:\/\//,''),normUrl(profile.linkedin),'#0A66C2',true));  // bleu LinkedIn
+  if(profile.github) rows.push(det(ic.github,profile.github.replace(/^https?:\/\//,''),normUrl(profile.github),'#24292F',true));           // GitHub
   $('dDetails').innerHTML=rows.join('');
   $('dDetails').style.display = rows.length?'flex':'none';
 
@@ -1018,8 +1025,11 @@ function renderCard(){
     .catch(qrFail);
 }
 function setQrMode(m){ lsSet('qrmode',m); renderCard(); }
-function det(icon,txt,href,color){
-  const inner=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg><span class="dt">${txt}</span>`;
+function det(icon,txt,href,color,filled){
+  const svg=filled
+    ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">${icon}</svg>`
+    : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>`;
+  const inner=`${svg}<span class="dt">${txt}</span>`;
   if(!href) return `<div class="det">${inner}</div>`;
   const st=color?` style="color:${color}"`:'';
   return `<a class="det det-link" href="${href}" target="_blank" rel="noopener"${st}>${inner}</a>`;
@@ -1670,19 +1680,54 @@ function startPixelScene(){
   loop();
 }
 function stopPixelScene(){ if(sceneRaf) cancelAnimationFrame(sceneRaf); sceneRaf=null; }
-function showSplash(done){
-  const sp=$('splash');
-  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(!sp || reduce){ done&&done(); return; }
-  sp._done=false;
-  const finish=()=>{ if(sp._done) return; sp._done=true; clearTimeout(sp._t);
-    sp.classList.remove('show');            // glisse vers le haut
-    setTimeout(stopPixelScene,520); done&&done(); };
-  startPixelScene();
-  requestAnimationFrame(()=>sp.classList.add('show'));   // glisse depuis le haut
-  sp.onclick=finish;                        // tap pour passer
-  sp._t=setTimeout(finish,2400);            // le bandeau reste ~2,4 s puis remonte
+
+/* ---- pull-to-refresh : tirer vers le bas révèle le bandeau (jamais sur "Ma carte") ---- */
+const ptr={active:false,y0:0,x0:0,d:0,refreshing:false};
+function ptrEls(){ return {sp:$('splash'), app:document.querySelector('.app')}; }
+function ptrBH(){ const sp=$('splash'); return (sp&&sp.offsetHeight)||84; }
+function ptrEligible(){ return currentView!=='card' && !ptr.refreshing && (window.scrollY||document.documentElement.scrollTop||0)<=0; }
+function ptrApply(d,anim){
+  const {sp,app}=ptrEls(); const BH=ptrBH(); const tr=anim?'transform .34s cubic-bezier(.2,.85,.25,1)':'none';
+  app.style.transition=tr; sp.style.transition=tr;
+  app.style.transform=`translateY(${d}px)`;
+  sp.style.transform=`translateY(${d-BH}px)`;
 }
+function ptrRest(anim){ ptrApply(0,anim);
+  if(anim) setTimeout(()=>{ const {app,sp}=ptrEls(); app.style.transform=''; sp.style.transform=''; },360);
+}
+function ptrRefresh(){
+  ptr.refreshing=true;
+  const BH=ptrBH();
+  if(!sceneRaf) startPixelScene();
+  ptrApply(BH,true);                                   // bandeau grand ouvert
+  setTimeout(()=>{                                     // à la FIN de l'animation → retour à la carte
+    go('card');
+    ptrRest(true);
+    setTimeout(()=>{ stopPixelScene(); ptr.refreshing=false; announceCard(); },380);
+  }, 1150);
+}
+document.addEventListener('touchstart',e=>{
+  if(!ptrEligible()){ ptr.active=false; return; }
+  ptr.active=true; ptr.y0=e.touches[0].clientY; ptr.x0=e.touches[0].clientX; ptr.d=0;
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(!ptr.active) return;
+  const dy=e.touches[0].clientY-ptr.y0, dx=e.touches[0].clientX-ptr.x0;
+  if(dy<=2 || Math.abs(dx)>Math.abs(dy)){ if(ptr.d>0){ ptrRest(true); stopPixelScene(); } ptr.active=false; return; }
+  if((window.scrollY||document.documentElement.scrollTop||0)>0){ ptr.active=false; return; }
+  e.preventDefault();                                  // on prend la main sur l'overscroll
+  const BH=ptrBH();
+  ptr.d=Math.min(dy*0.55, BH);
+  ptrApply(ptr.d,false);
+  if(ptr.d>10 && !sceneRaf) startPixelScene();
+},{passive:false});
+function ptrEnd(){
+  if(!ptr.active) return; ptr.active=false;
+  if(ptr.d>=ptrBH()*0.55) ptrRefresh();
+  else { ptrRest(true); setTimeout(stopPixelScene,360); }
+}
+document.addEventListener('touchend',ptrEnd,{passive:true});
+document.addEventListener('touchcancel',ptrEnd,{passive:true});
 
 /* ---- init ---- */
 (async function(){
@@ -1695,10 +1740,10 @@ function showSplash(done){
   renderCard();
   const hadIncoming=/#(p|c)=/.test(location.hash);
   checkIncoming();
-  // au rafraîchissement, si on a une carte et qu'on ne reçoit pas un contact :
-  // splash pixel (girafe) puis petite animation d'arrivée sur la carte
+  // au rafraîchissement, on arrive sur la carte : petite animation d'arrivée
+  // (le bandeau pixel, lui, se révèle en tirant vers le bas sur les autres onglets)
   if(!hadIncoming && profile && (profile.first||profile.last)){
-    showSplash(()=>setTimeout(announceCard,60));
+    setTimeout(announceCard,120);
   }
 })();
 window.addEventListener('pagehide',stopScanner);
