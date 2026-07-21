@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" href="./icon-192.png">
 <script src="./vendor/qrcode.min.js"></script>
 <script src="./vendor/jsQR.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js" defer></script>
+<script src="./vendor/tesseract/tesseract.min.js" defer></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
 
@@ -1138,7 +1138,11 @@ async function scanPaperCard(ev){
   $('ocrTitle').textContent='Lecture de la carte…';
 
   try{
-    const res=await Tesseract.recognize(lastCardUrl,'fra+eng',{
+    const res=await Tesseract.recognize(lastCardUrl,'fra',{
+      // moteur 100% auto-hébergé (aucun CDN) — le modèle français lit aussi le latin/anglais
+      workerPath:'./vendor/tesseract/worker.min.js',
+      corePath:'./vendor/tesseract/',
+      langPath:'./vendor/tesseract/',
       logger:m=>{
         if(m.status==='recognizing text'){
           const p=Math.round(m.progress*100);
