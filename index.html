@@ -453,6 +453,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 .star-btn:active{transform:scale(.8);}
 .star-btn.on{color:var(--accent);}
 .slot-card{position:relative;}
+.slot:not(.brk){-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
 .slot:not(.brk) .slot-tags{padding-right:36px;}
 .slot:not(.brk) .slot-title{padding-right:30px;}
 .slot.star .slot-card{box-shadow:inset 0 0 0 1.6px var(--accent), 0 0 0 3px rgba(255,76,1,.08);}
@@ -1419,13 +1420,12 @@ function renderProgram(){
   for(let h=d0/60;h<=d1/60;h+=step)
     html+=`<span style="left:${(h*60-d0)/span*100}%">${h}h</span>`;
   html+='</div></div>';
-  html+=`<div class="legend">
-    <span class="lg"><i style="background:var(--cat-cer)"></i>Cérémonie</span>
-    <span class="lg"><i style="background:var(--cat-panel)"></i>Panel</span>
-    <span class="lg"><i style="background:var(--cat-conf)"></i>Conférence</span>
-    <span class="lg"><i style="background:var(--cat-ws)"></i>Workshop</span>
-    <span class="lg"><i style="background:var(--cat-brk)"></i>Pause</span>
-  </div>`;
+  // légende : uniquement les types réellement présents dans ce qui est affiché
+  const CAT_INFO=[['cer','Cérémonie'],['panel','Panel'],['conf','Conférence'],['ws','Workshop'],['brk','Pause']];
+  const present=new Set(shown.map(si=>catOf(day.sessions[si])));
+  html+='<div class="legend">'+CAT_INFO.filter(([k])=>present.has(k))
+    .map(([k,l])=>`<span class="lg"><i style="background:var(--cat-${k})"></i>${l}</span>`).join('')+'</div>';
+  html+='<div class="swipe-hint" style="margin:2px 0 12px;opacity:.6">ASTUCE : APPUI LONG SUR UNE SESSION = LA SUIVRE ★</div>';
 
   const di=progDay;
   const starSvg=on=>`<svg width="21" height="21" viewBox="0 0 24 24" fill="${on?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6.9 7.5.6-5.7 5 1.8 7.4L12 18l-6.4 3.9 1.8-7.4-5.7-5 7.5-.6z"/></svg>`;
@@ -1508,6 +1508,26 @@ function startProgram(){
       const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
       if(Math.abs(dx)>60 && Math.abs(dx)>1.6*Math.abs(dy)) setProgDay(progDay+(dx<0?1:-1));
     },{passive:true});
+  }
+  // appui long sur une session (n'importe où sur la carte) = suivre / ne plus suivre
+  if(!window._progLong){
+    window._progLong=true;
+    const body=$('progBody'); let lt=null, sx=0, sy=0;
+    const clear=()=>{ if(lt){ clearTimeout(lt); lt=null; } };
+    body.addEventListener('pointerdown',e=>{
+      const slot=e.target.closest('.slot');
+      if(!slot || slot.classList.contains('brk')) return;
+      if(e.target.closest('.star-btn,.slot-ics')) return;   // laisse agir les boutons
+      const si=parseInt((slot.id||'').replace('slot-',''),10);
+      if(Number.isNaN(si)) return;
+      sx=e.clientX; sy=e.clientY;
+      clear(); lt=setTimeout(()=>{ lt=null; toggleStar(progDay,si); }, 480);
+    },{passive:true});
+    body.addEventListener('pointermove',e=>{
+      if(lt && (Math.abs(e.clientX-sx)>10||Math.abs(e.clientY-sy)>10)) clear();
+    },{passive:true});
+    body.addEventListener('pointerup',clear,{passive:true});
+    body.addEventListener('pointercancel',clear,{passive:true});
   }
 }
 function stopProgram(){ clearInterval(progTimer); progTimer=null; }
