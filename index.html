@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- durcissement : bloque plugins/embeds, l'injection de <base>, l'envoi de formulaires
+     et le clickjacking (frame-ancestors). Ne restreint pas script/connect → OCR intact. -->
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#0A1019">
 <title>Carte — SIATeG</title>
 <link rel="manifest" href="./manifest.webmanifest">
@@ -890,6 +894,8 @@ function beep(freqs,dur){
 function scanFeedback(){ haptic([35,45,35]); beep([880,1320],.2); }   // "bip-bip" ascendant + vibration
 function tapFeedback(){ haptic(15); beep([1400],.06); }               // clic léger (étoile)
 
+// échappement HTML : indispensable pour toute donnée non fiable (contact scanné, lien reçu…)
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function normUrl(u){ if(!u) return ''; u=u.trim(); return /^https?:\/\//i.test(u)?u:'https://'+u; }
 function escapeVcf(s){ return (s||'').replace(/([;,\\])/g,'\\$1').replace(/\n/g,'\\n'); }
 function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
@@ -1044,10 +1050,10 @@ function det(icon,txt,href,color,filled){
   const svg=filled
     ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">${icon}</svg>`
     : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg>`;
-  const inner=`${svg}<span class="dt">${txt}</span>`;
+  const inner=`${svg}<span class="dt">${esc(txt)}</span>`;
   if(!href) return `<div class="det">${inner}</div>`;
-  const st=color?` style="color:${color}"`:'';
-  return `<a class="det det-link" href="${href}" target="_blank" rel="noopener"${st}>${inner}</a>`;
+  const st=color?` style="color:${esc(color)}"`:'';
+  return `<a class="det det-link" href="${esc(href)}" target="_blank" rel="noopener"${st}>${inner}</a>`;
 }
 
 /* ---- partage WhatsApp ---- */
@@ -1277,11 +1283,11 @@ function renderContacts(){
   list.innerHTML=contacts.map(c=>{
     const meta=[c.phone,c.email,(c.linkedin||'').replace(/^https?:\/\//,'')].filter(Boolean).join(' · ');
     return `<div class="contact">
-      <div class="avatar">${initials(c.name)}</div>
+      <div class="avatar">${esc(initials(c.name))}</div>
       <div class="info">
-        <div class="cn">${c.name||'Contact'}</div>
-        ${c.role||c.org?`<div class="cr">${[c.role,c.org].filter(Boolean).join(' — ')}</div>`:''}
-        ${meta?`<div class="cmeta">${meta}</div>`:''}
+        <div class="cn">${esc(c.name||'Contact')}</div>
+        ${c.role||c.org?`<div class="cr">${esc([c.role,c.org].filter(Boolean).join(' — '))}</div>`:''}
+        ${meta?`<div class="cmeta">${esc(meta)}</div>`:''}
         <div class="cactions">
           <button class="mini" onclick="saveOne(${c.id})">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
