@@ -1148,6 +1148,53 @@ async function prepImageForOCR(url){
   if(bmp&&bmp.close) bmp.close();
   return c;
 }
+// version noir & blanc (Otsu) : parfois mieux, parfois moins bien → on essaie les deux et on garde le meilleur
+function otsuCanvas(src){
+  const w=src.width,h=src.height,c=document.createElement('canvas'); c.width=w;c.height=h;
+  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(src,0,0);
+  const im=x.getImageData(0,0,w,h),d=im.data,g=new Uint8Array(w*h);
+  for(let i=0,p=0;i<d.length;i+=4,p++) g[p]=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)|0;
+  const hist=new Array(256).fill(0); for(const v of g) hist[v]++;
+  const tot=g.length; let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
+  let sB=0,wB=0,mx=0,th=127;
+  for(let t=0;t<256;t++){ wB+=hist[t]; if(!wB)continue; const wF=tot-wB; if(!wF)break; sB+=t*hist[t];
+    const mB=sB/wB,mF=(sum-sB)/wF,bt=wB*wF*(mB-mF)*(mB-mF); if(bt>mx){mx=bt;th=t;} }
+  for(let i=0,p=0;i<d.length;i+=4,p++){ const v=g[p]>th?255:0; d[i]=d[i+1]=d[i+2]=v; }
+  x.putImageData(im,0,0); return c;
+}
+// score de qualité d'un texte OCR : email/téléphone détectés + proportion de "vrais mots"
+function ocrQuality(t){
+  t=t||''; let s=0;
+  if(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(t)) s+=4;
+  if(/\+?\(?\d[\d\s().\-]{6,}\d/.test(t)) s+=3;
+  const words=(t.match(/[A-Za-zÀ-ÿ]{3,}/g)||[]).length;
+  const toks=(t.match(/\S+/g)||[]).length||1;
+  s+=Math.min(6,words/3) + Math.min(3,(words/toks)*4);
+  return s;
+}
+let ocrWorker=null;
+async function getOcrWorker(onLog){
+  if(ocrWorker){ ocrWorker._log=onLog; return ocrWorker; }
+  const w=await Tesseract.createWorker('fra',1,{
+    workerPath:'./vendor/tesseract/worker.min.js', corePath:'./vendor/tesseract/', langPath:'./vendor/tesseract/',
+    logger:m=>{ if(ocrWorker&&ocrWorker._log) ocrWorker._log(m); }
+  });
+  await w.setParameters({tessedit_pageseg_mode:'3'});   // PSM 3 (auto) — le plus fiable sur les cartes
+  ocrWorker=w; ocrWorker._log=onLog; return ocrWorker;
+}
+// lit la carte en essayant image brute puis N&B, garde le meilleur résultat
+async function recognizeCard(canvas,onLog){
+  const worker=await getOcrWorker(onLog);
+  let best='', bestQ=-1;
+  const variants=[canvas, otsuCanvas(canvas)];
+  for(let i=0;i<variants.length;i++){
+    let txt=''; try{ txt=(await worker.recognize(variants[i])).data.text||''; }catch(e){ txt=''; }
+    const q=ocrQuality(txt);
+    if(q>bestQ){ bestQ=q; best=txt; }
+    if(bestQ>=9) break;   // déjà bon (email + téléphone + du texte) → inutile de continuer
+  }
+  return best;
+}
 async function scanPaperCard(ev){
   const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
   if(typeof Tesseract==='undefined'){ toast('Moteur OCR non chargé — réessaie'); return; }
@@ -1160,26 +1207,18 @@ async function scanPaperCard(ev){
   $('ocrTitle').textContent='Lecture de la carte…';
 
   try{
-    // charge via <img> (le navigateur applique l'orientation EXIF) puis dessine sur un
-    // canvas DROIT en haute résolution — sinon les photos de téléphone sont traitées de
-    // travers → charabia. Pas de binarisation (elle dégrade sur fond texturé).
-    const ocrInput=await prepImageForOCR(lastCardUrl).catch(()=>lastCardUrl);
-    const res=await Tesseract.recognize(ocrInput,'fra',{
-      // moteur 100% auto-hébergé (aucun CDN) — le modèle français lit aussi le latin/anglais
-      workerPath:'./vendor/tesseract/worker.min.js',
-      corePath:'./vendor/tesseract/',
-      langPath:'./vendor/tesseract/',
-      logger:m=>{
-        if(m.status==='recognizing text'){
-          const p=Math.round(m.progress*100);
-          $('ocrFill').style.width=p+'%'; $('ocrPct').textContent=p+' %';
-        } else if(m.status){
-          $('ocrPct').textContent='Préparation…';
-        }
-      }
+    // 1) redresse l'image (EXIF) sur un canvas haute résolution
+    // 2) essaie image brute + noir & blanc, garde le meilleur résultat (Tesseract est
+    //    instable sur les photos réelles : cette approche fiabilise la lecture)
+    const canvas=await prepImageForOCR(lastCardUrl);
+    const text=await recognizeCard(canvas, m=>{
+      if(m.status==='recognizing text'){
+        const p=Math.round(m.progress*100);
+        $('ocrFill').style.width=p+'%'; $('ocrPct').textContent=p+' %';
+      } else if(m.status){ $('ocrPct').textContent='Préparation…'; }
     });
     ov.classList.remove('show');
-    const parsed=parseCardText(res.data.text||'');
+    const parsed=parseCardText(text||'');
     openReview(parsed, lastCardUrl);
   }catch(e){
     ov.classList.remove('show');
