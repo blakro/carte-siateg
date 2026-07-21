@@ -140,9 +140,10 @@ header{padding:22px 2px 12px;}
 .det{display:flex;align-items:center;gap:10px;font-family:'Space Mono';
   font-size:calc(12.5px * var(--fs));color:#333b49;word-break:break-all;}
 .det svg{flex:none;color:var(--accent);}
-.det-link{text-decoration:none;color:inherit;cursor:pointer;}
-.det-link .dt{text-decoration:underline;text-decoration-thickness:1px;
-  text-underline-offset:3px;text-decoration-color:rgba(51,59,73,.4);}
+.det-link{text-decoration:none;cursor:pointer;}   /* couleur définie par lien (inline) */
+.det-link svg{color:inherit;}
+.det-link .dt{text-decoration:underline;text-decoration-thickness:1.5px;
+  text-underline-offset:3px;text-decoration-color:currentColor;}
 .det-link:active{opacity:.6;}
 
 /* QR reticle — cadre travaillé (dégradé accent + grille discrète) */
@@ -459,6 +460,22 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 .slot.star .slot-card{box-shadow:inset 0 0 0 1.6px var(--accent), 0 0 0 3px rgba(255,76,1,.08);}
 .time-rail .seg.star{box-shadow:0 0 0 2px var(--ground),0 0 0 3.5px var(--accent);z-index:2;}
 
+/* splash pixel (retour à la carte) */
+.splash{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;
+  background:radial-gradient(120% 80% at 50% 42%, #191007, #05070d 72%);
+  opacity:0;transition:opacity .45s ease;}
+.splash.show{display:flex;opacity:1;}
+.splash.hide{display:flex;opacity:0;pointer-events:none;}
+.splash-scene{width:min(86vw,340px);
+  box-shadow:0 20px 60px -24px rgba(0,0,0,.9);border-radius:12px;}
+#splashCv{width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;
+  display:block;border-radius:12px;}
+.splash-cap{font-family:'Space Mono';font-size:11.5px;letter-spacing:.24em;
+  text-transform:uppercase;color:#9a866a;
+  animation:capBlink 1.1s steps(2) infinite;}
+@keyframes capBlink{0%,100%{opacity:.55}50%{opacity:1}}
+
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important;}
 }
@@ -710,6 +727,12 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
       <button class="mini" onclick="receiveClose()">Plus tard</button>
     </div>
   </div>
+</div>
+
+<!-- splash pixel animé (girafe dans la savane) au retour sur la carte -->
+<div class="splash" id="splash">
+  <div class="splash-scene"><canvas id="splashCv" width="140" height="46"></canvas></div>
+  <div class="splash-cap" id="splashCap">Ta carte de visite</div>
 </div>
 
 <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
@@ -966,9 +989,9 @@ function renderCard(){
     link:'<path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>'
   };
   const rows=[];
-  if(profile.phone) rows.push(det(ic.phone,profile.phone,'tel:'+profile.phone.replace(/\s+/g,'')));
-  if(profile.email) rows.push(det(ic.email,profile.email,'mailto:'+profile.email.trim()));
-  if(profile.linkedin) rows.push(det(ic.link,profile.linkedin.replace(/^https?:\/\//,''),normUrl(profile.linkedin)));
+  if(profile.phone) rows.push(det(ic.phone,profile.phone,'tel:'+profile.phone.replace(/\s+/g,''),'#15803D'));      // vert
+  if(profile.email) rows.push(det(ic.email,profile.email,'mailto:'+profile.email.trim(),'#7C3AED'));                 // violet
+  if(profile.linkedin) rows.push(det(ic.link,profile.linkedin.replace(/^https?:\/\//,''),normUrl(profile.linkedin),'#0A66C2'));  // bleu LinkedIn
   $('dDetails').innerHTML=rows.join('');
   $('dDetails').style.display = rows.length?'flex':'none';
 
@@ -996,11 +1019,11 @@ function renderCard(){
     .catch(qrFail);
 }
 function setQrMode(m){ lsSet('qrmode',m); renderCard(); }
-function det(icon,txt,href){
+function det(icon,txt,href,color){
   const inner=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg><span class="dt">${txt}</span>`;
-  return href
-    ? `<a class="det det-link" href="${href}" target="_blank" rel="noopener">${inner}</a>`
-    : `<div class="det">${inner}</div>`;
+  if(!href) return `<div class="det">${inner}</div>`;
+  const st=color?` style="color:${color}"`:'';
+  return `<a class="det det-link" href="${href}" target="_blank" rel="noopener"${st}>${inner}</a>`;
 }
 
 /* ---- partage ---- */
@@ -1592,7 +1615,73 @@ function announceCard(){
   }
   const tab=document.querySelector('.tab[data-tab="card"]');
   if(tab){ tab.classList.remove('returned'); void tab.offsetWidth; tab.classList.add('returned'); }
-  toast('↩︎ Ta carte de visite');
+}
+
+/* ---- splash pixel : girafe qui marche dans la savane (retour à la carte) ---- */
+let sceneRaf=null;
+function drawGiraffeScene(ctx,W,H,t){
+  const px=(x,y,w,h,c)=>{ ctx.fillStyle=c; ctx.fillRect(x|0,y|0,w|0,h|0); };
+  ctx.clearRect(0,0,W,H);
+  const gY=36;                              // ligne de sol
+  // ciel dégradé (2 bandes)
+  px(0,0,W,gY,'#241a10'); px(0,0,W,14,'#2e2113');
+  // soleil pixel (bloc avec coins mangés)
+  const sx=22,sy=10; px(sx,sy,8,8,'#FF9A5B'); px(sx-1,sy+2,1,4,'#FF9A5B'); px(sx+8,sy+2,1,4,'#FF9A5B'); px(sx+2,sy-1,4,1,'#FF9A5B'); px(sx+2,sy+8,4,1,'#FF9A5B');
+  // collines de fond (défilent lentement)
+  const ob=(t*0.35)%(W+60);
+  ctx.fillStyle='#3a2a19';
+  for(let k=-1;k<3;k++){ const bx=k*70-ob+W*0; ctx.fillRect(bx,gY-8,34,8); ctx.fillRect(bx+8,gY-12,18,12); }
+  // sol
+  px(0,gY,W,H-gY,'#4a3420'); px(0,gY,W,1,'#6b8a3a');
+  // acacias + touffes qui défilent (premier plan)
+  const of=(t*1.15)%46;
+  for(let i=-1;i<5;i++){ const x=i*46-of;
+    px(x+6,gY-6,2,6,'#5a3f28');                 // tronc
+    px(x+1,gY-9,12,3,'#5f7d33'); px(x+3,gY-11,8,2,'#6b8a3a'); // canopée plate acacia
+    px(x+24,gY-2,3,2,'#5f7d33');                 // touffe d'herbe
+  }
+  // --- girafe (face à droite) qui marche sur place ---
+  const gx=58, fy=gY, bob=(Math.floor(t/6)%2), BODY='#E8A85A', SPOT='#A5652A', DK='#241708';
+  const b=bob; // léger sautillement
+  // pattes (2 frames)
+  const p=Math.floor(t/7)%2;
+  const legY=fy-8+b;
+  const legs=[gx+1,gx+5,gx+10,gx+14];
+  legs.forEach((lx,i)=>{ const up=(i%2===p)?2:0; px(lx,legY,2,8-up,BODY); px(lx,legY+8-up-1,2,1,DK); });
+  // corps
+  px(gx,fy-15+b,15,7,BODY);
+  // taches corps
+  px(gx+2,fy-13+b,3,2,SPOT); px(gx+7,fy-11+b,2,2,SPOT); px(gx+11,fy-14+b,2,2,SPOT);
+  // queue
+  px(gx-1,fy-13+b,1,6,BODY); px(gx-1,fy-8+b,1,2,DK);
+  // cou
+  px(gx+10,fy-27+b,3,12,BODY); px(gx+11,fy-24+b,2,2,SPOT); px(gx+11,fy-20+b,1,2,SPOT);
+  // tête + museau
+  px(gx+9,fy-31+b,6,5,BODY); px(gx+15,fy-29+b,3,3,BODY);
+  // oreille + ossicônes
+  px(gx+8,fy-30+b,1,2,BODY); px(gx+10,fy-34+b,1,3,BODY); px(gx+13,fy-34+b,1,3,BODY);
+  px(gx+10,fy-35+b,1,1,SPOT); px(gx+13,fy-35+b,1,1,SPOT);
+  // œil
+  px(gx+12,fy-30+b,1,1,DK);
+}
+function startPixelScene(){
+  const cv=$('splashCv'); if(!cv) return; const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
+  let t=0; const loop=()=>{ drawGiraffeScene(ctx,cv.width,cv.height,t); t+=1.6; sceneRaf=requestAnimationFrame(loop); };
+  loop();
+}
+function stopPixelScene(){ if(sceneRaf) cancelAnimationFrame(sceneRaf); sceneRaf=null; }
+function showSplash(done){
+  const sp=$('splash');
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!sp || reduce){ done&&done(); return; }
+  sp._done=false;
+  const finish=()=>{ if(sp._done) return; sp._done=true; clearTimeout(sp._t); stopPixelScene();
+    sp.classList.remove('show'); sp.classList.add('hide');
+    setTimeout(()=>sp.classList.remove('hide'),480); done&&done(); };
+  sp.classList.remove('hide'); sp.classList.add('show');
+  startPixelScene();
+  sp.onclick=finish;                       // tap pour passer
+  sp._t=setTimeout(finish,1900);           // durée du splash
 }
 
 /* ---- init ---- */
@@ -1604,10 +1693,10 @@ function announceCard(){
   renderCard();
   const hadIncoming=/#(p|c)=/.test(location.hash);
   checkIncoming();
-  // si on a une carte et qu'on n'est pas en train de recevoir un contact,
-  // on signale visiblement l'arrivée sur la carte (sinon ça ressemble à un bug)
+  // au rafraîchissement, si on a une carte et qu'on ne reçoit pas un contact :
+  // splash pixel (girafe) puis petite animation d'arrivée sur la carte
   if(!hadIncoming && profile && (profile.first||profile.last)){
-    setTimeout(announceCard,120);
+    showSplash(()=>setTimeout(announceCard,60));
   }
 })();
 window.addEventListener('pagehide',stopScanner);
