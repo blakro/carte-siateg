@@ -1126,21 +1126,27 @@ function decodeFile(ev){
 
 /* ---- OCR carte papier (Tesseract, 100% local) ---- */
 let lastCardUrl='';
-// charge l'image en respectant l'orientation EXIF, la dessine droite sur un canvas haute résolution
-function prepImageForOCR(url){
-  return new Promise((resolve,reject)=>{
-    const img=new Image();
-    img.onload=()=>{
-      let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
-      if(!w||!h){ reject(new Error('image vide')); return; }
-      const cap=3200, s=Math.min(1, cap/Math.max(w,h));   // borne la taille sans trop réduire
-      w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s));
-      const c=document.createElement('canvas'); c.width=w; c.height=h;
-      const ctx=c.getContext('2d'); ctx.imageSmoothingQuality='high'; ctx.drawImage(img,0,0,w,h);
-      resolve(c);
-    };
-    img.onerror=reject; img.src=url;
-  });
+// charge l'image en respectant l'orientation EXIF, la dessine DROITE sur un canvas haute résolution.
+// createImageBitmap({imageOrientation:'from-image'}) applique l'EXIF de façon fiable (contrairement
+// au chargement direct par Tesseract, qui lit les photos de téléphone de travers → charabia).
+async function prepImageForOCR(url){
+  let source=null, sw=0, sh=0, bmp=null;
+  try{
+    const blob=await fetch(url).then(r=>r.blob());
+    bmp=await createImageBitmap(blob,{imageOrientation:'from-image'});
+    source=bmp; sw=bmp.width; sh=bmp.height;
+  }catch(e){ source=null; }
+  if(!source){   // repli : <img>
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    source=img; sw=img.naturalWidth||img.width; sh=img.naturalHeight||img.height;
+  }
+  if(!sw||!sh) throw new Error('image vide');
+  const cap=3200, s=Math.min(1, cap/Math.max(sw,sh));
+  const w=Math.max(1,Math.round(sw*s)), h=Math.max(1,Math.round(sh*s));
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx=c.getContext('2d'); ctx.imageSmoothingQuality='high'; ctx.drawImage(source,0,0,w,h);
+  if(bmp&&bmp.close) bmp.close();
+  return c;
 }
 async function scanPaperCard(ev){
   const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
