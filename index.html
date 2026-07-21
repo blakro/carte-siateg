@@ -595,7 +595,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
         <input type="file" accept="image/*" capture="environment" onchange="scanPaperCard(event)" hidden>
       </label>
     </div>
-    <div class="ocr-note">Lecture par IA embarquée — la photo ne quitte jamais ton téléphone.</div>
+    <div class="ocr-note">Astuce : cadre la carte bien à plat, qu'elle remplisse l'écran, à la lumière.<br>Lecture par IA embarquée — la photo ne quitte jamais ton téléphone.</div>
     <canvas id="scanCanvas" hidden></canvas>
   </section>
 
@@ -1126,6 +1126,22 @@ function decodeFile(ev){
 
 /* ---- OCR carte papier (Tesseract, 100% local) ---- */
 let lastCardUrl='';
+// charge l'image en respectant l'orientation EXIF, la dessine droite sur un canvas haute résolution
+function prepImageForOCR(url){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+      if(!w||!h){ reject(new Error('image vide')); return; }
+      const cap=3200, s=Math.min(1, cap/Math.max(w,h));   // borne la taille sans trop réduire
+      w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      const ctx=c.getContext('2d'); ctx.imageSmoothingQuality='high'; ctx.drawImage(img,0,0,w,h);
+      resolve(c);
+    };
+    img.onerror=reject; img.src=url;
+  });
+}
 async function scanPaperCard(ev){
   const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
   if(typeof Tesseract==='undefined'){ toast('Moteur OCR non chargé — réessaie'); return; }
@@ -1138,7 +1154,11 @@ async function scanPaperCard(ev){
   $('ocrTitle').textContent='Lecture de la carte…';
 
   try{
-    const res=await Tesseract.recognize(lastCardUrl,'fra',{
+    // charge via <img> (le navigateur applique l'orientation EXIF) puis dessine sur un
+    // canvas DROIT en haute résolution — sinon les photos de téléphone sont traitées de
+    // travers → charabia. Pas de binarisation (elle dégrade sur fond texturé).
+    const ocrInput=await prepImageForOCR(lastCardUrl).catch(()=>lastCardUrl);
+    const res=await Tesseract.recognize(ocrInput,'fra',{
       // moteur 100% auto-hébergé (aucun CDN) — le modèle français lit aussi le latin/anglais
       workerPath:'./vendor/tesseract/worker.min.js',
       corePath:'./vendor/tesseract/',
@@ -1164,13 +1184,19 @@ async function scanPaperCard(ev){
 }
 
 function parseCardText(text){
-  const lines=text.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  // nettoie chaque ligne : retire le bruit OCR en début/fin (symboles isolés)
+  const clean1=l=>l.replace(/^[^\p{L}\d+]+/u,'').replace(/[^\p{L}\d.)]+$/u,'').replace(/\s{2,}/g,' ').trim();
+  const lines=text.split(/\n/).map(clean1).filter(l=>l.length>1);
   const emailRe=/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
   const linkedinRe=/(linkedin\.com\/[^\s]+)/i;
   const urlRe=/((https?:\/\/)?(www\.)?[a-z0-9-]+\.(com|org|net|io|ne|fr|africa|co|tech|ai)(\/[^\s]*)?)/i;
   const phoneRe=/(\+?\(?\d[\d\s().\-]{6,}\d)/;
-  const orgKw=/(sarl|s\.a|inc|ltd|llc|universit|institut|agence|agency|minist|company|technolog|solutions|group|groupe|consult|center|centre|labo|startup|hub|bank|banque|telecom)/i;
-  const roleKw=/(manager|director|directeur|directrice|ingénieur|ingenieur|engineer|développeur|developpeur|developer|data|scientist|analyst|analyste|chef|head|lead|founder|fondateur|ceo|cto|coo|responsable|consultant|professor|professeur|doctor|docteur|phd|étudiant|etudiant|student|chercheur|researcher|designer|expert|officer|coordinat)/i;
+  const orgKw=/(sarl|s\.a|s\.a\.r\.l|inc|ltd|llc|universit|institut|agence|agency|minist|company|trading|technolog|solutions|services|group|groupe|consult|center|centre|labo|startup|hub|bank|banque|telecom|sa\b|sas\b|corp)/i;
+  const roleKw=/(manager|director|directeur|directrice|ingénieur|ingenieur|engineer|développeur|developpeur|developer|data|scientist|analyst|analyste|chef|head|lead|founder|fondateur|ceo|cto|coo|responsable|consultant|professor|professeur|doctor|docteur|phd|étudiant|etudiant|student|chercheur|researcher|designer|expert|officer|coordinat|commercial|gérant|gerant|assistant)/i;
+  // mots/logos à ignorer pour le NOM ; fournisseurs d'email grand public (pas une organisation)
+  const noiseKw=/^(orange|lg|life|www|t[eé]l|mobile|fixe|whatsapp|e-?mail|email|bp|adresse|contact|niger|niamey|good)$/i;
+  const addrKw=/(avenue|\bave\b|\brue\b|boulevard|\bbp\b|route|quartier|\bcit[eé]|niamey|niger|street|road|pharmacie|c[oô]t[eé])/i;
+  const freeMail=/^(gmail|yahoo|hotmail|outlook|live|icloud|proton|protonmail|orange\.fr)$/i;
 
   let email='',phone='',linkedin='',website='';
   for(const l of lines){
@@ -1179,20 +1205,39 @@ function parseCardText(text){
     if(!phone){ const m=l.match(phoneRe); if(m && m[1].replace(/\D/g,'').length>=7) phone=m[1].trim(); }
   }
   if(!linkedin){ for(const l of lines){ const m=l.match(urlRe);
-    if(m && !emailRe.test(m[0])){ website=m[0]; break; } } }
+    if(m && !emailRe.test(m[0]) && !/@/.test(m[0])){ website=m[0]; break; } } }
 
   // lignes "propres" candidates pour nom / rôle / organisation
-  const clean=lines.filter(l=>!emailRe.test(l)&&!linkedinRe.test(l)&&!phoneRe.test(l)&&!urlRe.test(l));
+  const cand=lines.filter(l=>!emailRe.test(l)&&!linkedinRe.test(l)&&!phoneRe.test(l)&&!urlRe.test(l));
   let role='',org='',nameLine='';
-  for(const l of clean){ if(!role && roleKw.test(l)) role=l; }
-  for(const l of clean){ if(!org && orgKw.test(l) && l!==role) org=l; }
-  for(const l of clean){
-    const letters=l.replace(/[^a-zàâäéèêëïîôöùûüç]/gi,'').length;
-    const words=l.split(/\s+/).length;
-    if(l!==role && l!==org && letters>=3 && words<=4 && /[a-zàâäéèêëïîôöùûüç]/i.test(l)){ nameLine=l; break; }
+  for(const l of cand){ if(!role && roleKw.test(l)) role=l; }
+  for(const l of cand){ if(!org && orgKw.test(l) && l!==role) org=l; }
+  // nom : pas un logo/mot-bruit ni le rôle/org ; on score et on prend le meilleur
+  const nameScore=(l,idx)=>{
+    if(!l||l===role||l===org||noiseKw.test(l)||addrKw.test(l)) return -999;
+    if(roleKw.test(l)||orgKw.test(l)) return -999;
+    const toks=l.split(/\s+/);
+    if(toks.length>4) return -999;
+    const alpha=toks.filter(w=>/[a-zàâäéèêëïîôöùûüç]{2,}/i.test(w)).length;   // mots d'au moins 2 lettres
+    if(alpha<1 || !/[a-zàâäéèêëïîôöùûüç]{3,}/i.test(l)) return -999;
+    let sc=alpha*2;
+    if(/^[A-ZÀ-Ü][a-zà-ü]/.test(l)||/^[A-ZÀ-Ü .'\-]+$/.test(l)) sc+=2;        // Titre ou MAJUSCULES
+    sc+=Math.max(0,3-idx);                                                    // léger bonus au haut de carte
+    return sc;
+  };
+  let best=-999; cand.forEach((l,i)=>{ const s=nameScore(l,i); if(s>best){ best=s; nameLine=l; } });
+  if(best<=-999) nameLine='';
+  // recombine "Prénom Initiales" + "NOM" (format fréquent : ligne titre puis ligne MAJUSCULES)
+  if(nameLine && !/^[A-ZÀ-Ü .'\-]+$/.test(nameLine)){
+    const nx=cand[cand.indexOf(nameLine)+1];
+    if(nx && /^[A-ZÀ-Ü][A-ZÀ-Ü'\-]{3,}$/.test(nx) && !orgKw.test(nx) && !roleKw.test(nx) && !noiseKw.test(nx) && !addrKw.test(nx))
+      nameLine=nameLine+' '+nx;
   }
+  const trimNoise=s=>(s||'').replace(/^[\s.,;:|]+|[\s.,;:|]+$/g,'').trim();
+  role=trimNoise(role); org=trimNoise(org); nameLine=trimNoise(nameLine);
+  // repli organisation via le domaine d'email — sauf fournisseurs grand public
   if(!org && email){ const dom=email.split('@')[1].split('.')[0];
-    if(dom && dom.length<=6) org=dom.toUpperCase(); }
+    if(dom && dom.length<=8 && !freeMail.test(dom)) org=dom.toUpperCase(); }
 
   const parts=(nameLine||'').split(/\s+/);
   const first=parts.slice(0,-1).join(' ')||parts[0]||'';
