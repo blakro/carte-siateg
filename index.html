@@ -898,15 +898,28 @@ function initials(n){ return (n||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join(
 function b64urlEncode(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function b64urlDecode(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
 function appUrl(){ return /^https?:$/.test(location.protocol) ? location.origin+location.pathname : ''; }
+// raccourcit les liens dans le code : ne garde que le pseudo (domaine reconstruit à la lecture)
+function packLink(v,kind){
+  let s=(v||'').trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'');
+  if(kind==='li'){ const m=s.match(/^(?:[a-z]+\.)?linkedin\.com\/in\/([^/]+)$/i); if(m) return m[1]; }
+  if(kind==='gh'){ const m=s.match(/^github\.com\/([^/]+)$/i); if(m) return m[1]; }
+  return s;
+}
+function expandLink(s,kind){
+  if(!s) return '';
+  if(s.includes('/')||s.includes('.')||/^https?:/i.test(s)) return s;   // déjà une URL / un chemin
+  return kind==='li' ? 'linkedin.com/in/'+s : 'github.com/'+s;          // pseudo seul → reconstruit
+}
 // format compact (QR moins dense que la vCard complète → scan bien plus fiable)
 function packProfile(p){
-  return b64urlEncode(['2',p.first||'',p.last||'',p.role||'',p.org||'',p.phone||'',p.email||'',p.linkedin||'',p.github||''].join('\n'));
+  return b64urlEncode(['2',p.first||'',p.last||'',p.role||'',p.org||'',p.phone||'',p.email||'',
+    packLink(p.linkedin,'li'),packLink(p.github,'gh')].join('\n'));
 }
 function unpackProfile(s){
   let f; try{ f=b64urlDecode(s).split('\n'); }catch(e){ return null; }
   if(f[0]!=='1' && f[0]!=='2') return null;           // v1 (sans github) ou v2 (avec github)
   const p={ first:f[1]||'', last:f[2]||'', role:f[3]||'', org:f[4]||'',
-            phone:f[5]||'', email:f[6]||'', linkedin:f[7]||'', github:f[8]||'' };
+            phone:f[5]||'', email:f[6]||'', linkedin:expandLink(f[7]||'','li'), github:expandLink(f[8]||'','gh') };
   p.name=`${p.first} ${p.last}`.trim();
   p.raw=buildVCard(p);
   return p.name?p:null;
@@ -1047,8 +1060,8 @@ function shareWhatsApp(){
   const sub=[p.role,p.org].filter(Boolean).join(', '); if(sub) L.push(sub);
   if(p.phone)    L.push(`📞 ${p.phone}`);
   if(p.email)    L.push(`✉️ ${p.email}`);
-  if(p.linkedin) L.push(`💼 ${normUrl(p.linkedin)}`);
-  if(p.github)   L.push(`🐙 ${normUrl(p.github)}`);
+  if(p.linkedin) L.push(`💼 ${p.linkedin.replace(/^https?:\/\//,'')}`);
+  if(p.github)   L.push(`🐙 ${p.github.replace(/^https?:\/\//,'')}`);
   if(link) L.push(`\n👉 Ma carte + l'app SIATeG : ${link}`);
   window.open('https://wa.me/?text='+encodeURIComponent(L.join('\n')),'_blank','noopener');
 }
