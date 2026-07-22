@@ -546,6 +546,13 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
         Partager</button>
       <button class="btn ghost" onclick="go('edit')">Modifier</button>
     </div>
+    <!-- visible uniquement sur les téléphones compatibles NFC (Chrome Android) -->
+    <div class="row" id="nfcRow" style="display:none">
+      <button class="btn ghost" onclick="writeNfc()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8.32a7.4 7.4 0 010 7.36M9.7 6a10.4 10.4 0 010 12M13.4 3.7a13.5 13.5 0 010 16.6M2.3 10.6a4.2 4.2 0 010 2.8"/></svg>
+        Graver ma carte sur un tag NFC</button>
+    </div>
+    <div class="ocr-note" id="nfcNote" style="display:none">Colle un autocollant NFC sur ton badge : un tap dessus ouvre ta carte, sans scanner.</div>
   </section>
 
   <!-- ===== EDITION ===== -->
@@ -886,12 +893,12 @@ function beep(freqs,dur){
   try{
     const t=audioCtx.currentTime, o=audioCtx.createOscillator(), g=audioCtx.createGain();
     o.type='sine'; freqs.forEach((f,i)=>o.frequency.setValueAtTime(f, t+i*(dur/freqs.length)));
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(.28,t+.012);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(.5,t+.012);   // volume audible en salle bruyante
     g.gain.exponentialRampToValueAtTime(.0001,t+dur);
     o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+dur+.02);
   }catch(e){}
 }
-function scanFeedback(){ haptic([35,45,35]); beep([880,1320],.2); }   // "bip-bip" ascendant + vibration
+function scanFeedback(){ haptic([35,45,35]); beep([880,1320],.28); }  // "bip-bip" ascendant + vibration
 function tapFeedback(){ haptic(15); beep([1400],.06); }               // clic léger (étoile)
 
 // échappement HTML : indispensable pour toute donnée non fiable (contact scanné, lien reçu…)
@@ -996,11 +1003,15 @@ function renderCard(){
     $('cardEmpty').classList.remove('hidden');
     $('cardFace').classList.add('hidden');
     $('cardActions').style.display='none';
+    $('nfcRow').style.display='none'; $('nfcNote').style.display='none';
     return;
   }
   $('cardEmpty').classList.add('hidden');
   $('cardFace').classList.remove('hidden');
   $('cardActions').style.display='flex';
+  const nfc=nfcSupported() && !!appUrl();
+  $('nfcRow').style.display=nfc?'flex':'none';
+  $('nfcNote').style.display=nfc?'block':'none';
 
   const fn=`${profile.first||''} ${profile.last||''}`.trim();
   $('dName').textContent=fn;
@@ -1054,6 +1065,26 @@ function det(icon,txt,href,color,filled){
   if(!href) return `<div class="det">${inner}</div>`;
   const st=color?` style="color:${esc(color)}"`:'';
   return `<a class="det det-link" href="${esc(href)}" target="_blank" rel="noopener"${st}>${inner}</a>`;
+}
+
+/* ---- NFC : graver sa carte sur un tag / autocollant (Chrome Android) ----
+   Note : le web ne permet pas le NFC téléphone-à-téléphone ; on écrit le lien
+   "carte + app" sur un tag physique — un tap dessus ouvre la carte. */
+function nfcSupported(){ return 'NDEFReader' in window; }
+async function writeNfc(){
+  if(!nfcSupported() || !profile || (!profile.first&&!profile.last)) return;
+  const url=appUrl();
+  if(!url){ toast('Disponible une fois l\'app hébergée en HTTPS'); return; }
+  const link=url+'#p='+packProfile(profile);
+  try{
+    toast('Approche le tag NFC du dos du téléphone…');
+    await new NDEFReader().write({records:[{recordType:'url',data:link}]});
+    scanFeedback();
+    toast('✓ Tag gravé — un tap dessus ouvre ta carte');
+  }catch(e){
+    if(e && (e.name==='AbortError'||e.name==='NotAllowedError')) return;
+    toast('Écriture impossible — garde le tag collé au téléphone et réessaie');
+  }
 }
 
 /* ---- partage WhatsApp ---- */
