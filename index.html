@@ -2008,9 +2008,22 @@ async function doInstall(){
   toast('Utilise le menu du navigateur → « Installer / Ajouter à l\'écran d\'accueil »');
 }
 
-/* ---- service worker (hors-ligne) ---- */
+/* ---- service worker (hors-ligne) + mise à jour automatique ---- */
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+  // si une nouvelle version est déployée, on recharge une fois automatiquement
+  // (évite de rester bloqué sur une ancienne version en cache sur PC/desktop)
+  const hadController=!!navigator.serviceWorker.controller;
+  let reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(reloading || !hadController) return;   // pas de rechargement au tout premier chargement
+    reloading=true; location.reload();
+  });
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      reg.update && reg.update();                 // vérifie une MAJ à chaque ouverture
+      setInterval(()=>reg.update&&reg.update(), 60*60*1000);
+    }).catch(()=>{});
+  });
 }
 </script>
 </body>
