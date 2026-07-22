@@ -3,10 +3,15 @@
 **Fini les piles de cartes papier qu'on perd.** Un QR code, un scan, et le tour est joué :
 ton contact (et le sien) est enregistré, en 2 secondes, sans rien installer.
 
+### 👉 Ouvre l'app : **https://blakro.github.io/carte-siateg/**
+
 - 📱 **Ta carte** — nom, poste, téléphone, email, LinkedIn, GitHub, en un QR à montrer
 - 🤝 **Échange instantané** — scanne le QR d'un autre participant, il apparaît dans ton carnet
-- 📸 **Carte papier ? Pas de souci** — prends-la en photo, l'app lit le texte toute seule
-- 🗓️ **Le programme du forum** — toujours sous la main, avec tes sessions favorites
+- 💬 **Partage en un tap** — envoie ta carte par **WhatsApp** ; le lien ouvre l'app chez ton contact
+- 📡 **NFC** — sur les téléphones compatibles, grave ta carte sur un tag/autocollant : un tap l'ouvre
+- 📸 **Carte papier ? Pas de souci** — prends-la en photo, l'app lit le texte toute seule (OCR)
+- 🗓️ **Le programme du forum** — frise chronologique, sessions favorites, ajout au calendrier
+- 🎨 **Confort de lecture** — thème jour/nuit, taille du texte réglable
 - 🔒 **100 % privé** — tout reste sur ton téléphone, rien n'est envoyé sur un serveur
 - 🆓 **Gratuit, sans compte, sans pub** — juste un lien à ouvrir
 
@@ -52,6 +57,14 @@ serveur : la carte est encodée dans le lien lui-même.
 Un sélecteur sous le QR permet de basculer en mode **« Contact direct »**
 (vCard pure) : utile si le réseau du forum est saturé, car ce mode fonctionne
 sans aucune connexion chez la personne qui scanne (mais n'apporte pas l'app).
+
+## Partage WhatsApp & NFC
+- **WhatsApp** : le bouton « Partager » de ta carte ouvre WhatsApp avec un message
+  prêt à envoyer (tes infos + le lien vers ta carte) — choisis le contact, c'est parti.
+- **NFC** (Chrome Android compatible uniquement) : le bouton « Graver ma carte sur un
+  tag NFC » écrit ton lien sur un autocollant/tag NFC (ex. NTAG213/215). Colle-le sur
+  ton badge : un simple tap du téléphone dessus ouvre ta carte. Le web ne permet pas le
+  NFC téléphone-à-téléphone — d'où le passage par un tag physique.
 
 ## Thème jour / nuit
 Le bouton en haut (AUTO / JOUR / NUIT) adapte les couleurs : **Jour** = contrastes
@@ -101,3 +114,7 @@ Le champ `date` (format `AAAA-MM-JJ`) sert au statut « en cours » et aux fichi
   papier (~10 Mo, une seule fois), puis mis en cache pour marcher hors-ligne.
 - Le partage de contact par QR marche pour tout le monde : celui qui scanne n'a
   besoin d'aucune app, juste de l'appareil photo de son téléphone.
+- **Mise à jour automatique** : quand une nouvelle version est déployée, l'app se
+  recharge toute seule à l'ouverture suivante (le service worker vérifie les MAJ).
+  Sur PC, si une vieille version reste affichée, un rechargement forcé
+  (`Ctrl`+`Maj`+`R`) ou « vider le cache du site » règle le cas une fois.
