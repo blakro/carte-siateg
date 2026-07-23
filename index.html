@@ -442,6 +442,11 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
 .day-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 .day-sub{font-family:'Space Mono';font-size:calc(10.5px * var(--fs));color:var(--muted);
   text-align:center;margin:0 2px 12px;letter-spacing:.04em;}
+.delay-note{display:flex;align-items:center;justify-content:center;gap:6px;
+  margin:0 2px 12px;padding:8px 12px;border-radius:11px;
+  background:rgba(255,76,1,.12);border:1px solid rgba(255,76,1,.35);
+  color:var(--accent-strong);font-family:'Space Grotesk';font-weight:600;
+  font-size:calc(12px * var(--fs));text-align:center;}
 .swipe-hint{text-align:center;font-family:'Space Mono';font-size:calc(9.5px * var(--fs));color:var(--muted);
   opacity:.7;margin:-4px 0 10px;letter-spacing:.08em;}
 .legend{display:flex;flex-wrap:wrap;gap:7px 12px;margin:0 2px 14px;}
@@ -763,12 +768,15 @@ const EVENT = {
 /* ============ PROGRAMME (change ceci pour un autre forum) =================== */
 /* Chaque session : start/end en "HH:MM", place (Présentiel/Hybride), kind (badge),
    title, desc (facultatif), who[] (intervenants), mod (modérateur), brk:true pour
-   les pauses/logistique. Ajoute un objet dans "days" pour une nouvelle journée. */
+   les pauses/logistique. Ajoute un objet dans "days" pour une nouvelle journée.
+   shift: minutes de décalage appliquées à TOUTES les sessions du jour (retard au
+   démarrage) — mets 0 quand le forum est à l'heure. */
 const PROGRAM = {
   days: [
     {
       date: "2026-07-23",            // Jour 1 — sert au statut "en cours" et à l'export .ics
       label: "Jour 1 — 23 juillet",
+      shift: 77,                     // +1h17 : ouverture partie à 9h47 au lieu de 8h30
       sessions: [
         { start:"07:30", end:"08:30", brk:true, kind:"Accueil",
           title:"Confirmation d'inscription, accueil et installation des invités",
@@ -1496,6 +1504,14 @@ async function saveAllToPhone(){
 /* ---- agenda / programme ---- */
 let progTimer=null, progDay=null, progStarOnly=false, starred={};
 function fmtHM(t){ return t.replace(':','h'); }
+// décalage d'un jour (retard au démarrage) : renvoie l'heure "HH:MM" décalée
+function dShift(d){ return (d&&d.shift)||0; }
+function shiftHM(d,t){
+  const [h,m]=t.split(':').map(Number);
+  let x=(((h*60+m+dShift(d))%1440)+1440)%1440;
+  return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0');
+}
+function fmtDelay(x){ const H=Math.floor(x/60), M=x%60; return (H?H+' h'+(M?' '+M:''):M+' min'); }
 function sessionKey(d,s){ return `${d.date}|${s.start}|${s.title}`; }
 async function toggleStar(di,si){
   const d=PROGRAM.days[di], s=d.sessions[si], k=sessionKey(d,s);
@@ -1529,7 +1545,7 @@ function statusOf(now){
   let nextKey=null;
   const rows=[];
   PROGRAM.days.forEach((d,di)=>d.sessions.forEach((s,si)=>{
-    const st=slotDate(d.date,s.start), en=slotDate(d.date,s.end);
+    const st=slotDate(d.date,shiftHM(d,s.start)), en=slotDate(d.date,shiftHM(d,s.end));
     let cls='next-candidate';
     if(now>en) cls='past';
     else if(now>=st && now<=en) cls='now';
@@ -1568,6 +1584,8 @@ function renderProgram(){
   html+='<div class="swipe-hint">← GLISSE POUR CHANGER DE JOUR →</div>';
 
   const day=days[progDay];
+  const S=t=>shiftHM(day,t);   // heure décalée (retard au démarrage)
+  if(dShift(day)) html+=`<div class="delay-note">⏱ Horaires ajustés : +${fmtDelay(dShift(day))} de retard au démarrage</div>`;
   const nStar=starCount(day);
   // filtre "Mes sessions" (visible dès qu'on a étoilé quelque chose)
   const anyStar=days.some(d=>starCount(d)>0);
@@ -1587,14 +1605,14 @@ function renderProgram(){
 
   // barre de temps : segments proportionnels, tap/glisse = saut à la session
   const mins=t=>{ const [h,m]=t.split(':').map(Number); return h*60+m; };
-  const d0=Math.floor(Math.min(...day.sessions.map(s=>mins(s.start)))/60)*60;
-  const d1=Math.ceil(Math.max(...day.sessions.map(s=>mins(s.end)))/60)*60;
+  const d0=Math.floor(Math.min(...day.sessions.map(s=>mins(S(s.start))))/60)*60;
+  const d1=Math.ceil(Math.max(...day.sessions.map(s=>mins(S(s.end))))/60)*60;
   const span=d1-d0;
   const pct=t=>((mins(t)-d0)/span*100);
   // 2 couloirs quand des sessions affichées se chevauchent (workshops en parallèle)
   const lane={}; let twoLanes=false; const used=[];
   shown.forEach(si=>{ const s=day.sessions[si];
-    let placed=0; for(const u of used){ if(mins(s.start)<mins(day.sessions[u].end) && mins(s.end)>mins(day.sessions[u].start)){ placed=1; twoLanes=true; break; } }
+    let placed=0; for(const u of used){ if(mins(S(s.start))<mins(S(day.sessions[u].end)) && mins(S(s.end))>mins(S(day.sessions[u].start))){ placed=1; twoLanes=true; break; } }
     lane[si]=placed; if(!placed) used.push(si); });
   html+='<div class="time-wrap"><div class="time-rail" id="timeRail">';
   shown.forEach(si=>{
@@ -1602,7 +1620,7 @@ function renderProgram(){
     const top = twoLanes ? (lane[si]===0?7:29) : 8;
     const h = twoLanes ? 18 : 38;
     const star = starred[sessionKey(day,s)] ? ' star':'';
-    html+=`<span class="seg${star}" data-si="${si}" style="left:${pct(s.start)}%;width:${Math.max(1.2,pct(s.end)-pct(s.start))}%;top:${top}px;height:${h}px;background:var(--cat-${catOf(s)})"></span>`;
+    html+=`<span class="seg${star}" data-si="${si}" style="left:${pct(S(s.start))}%;width:${Math.max(1.2,pct(S(s.end))-pct(S(s.start)))}%;top:${top}px;height:${h}px;background:var(--cat-${catOf(s)})"></span>`;
   });
   // curseur "maintenant" si on est le jour affiché, dans la plage horaire
   const nowMin=now.getHours()*60+now.getMinutes();
@@ -1641,7 +1659,7 @@ function renderProgram(){
     const ics=s.brk?'':`<button class="slot-ics" onclick="exportSession(${di},${si})">${svgCal} Ajouter au calendrier</button>`;
     const star=s.brk?'':`<button class="star-btn ${isStar?'on':''}" onclick="toggleStar(${di},${si})" aria-label="Suivre cette session">${starSvg(isStar)}</button>`;
     html+=`<div class="slot ${s.brk?'brk':''} cat-${catOf(s)} ${cls} ${isStar?'star':''}" id="slot-${si}">
-      <div class="st-time">${fmtHM(s.start)} – ${fmtHM(s.end)}${label?`<span class="st-status">${label}</span>`:''}</div>
+      <div class="st-time">${fmtHM(S(s.start))} – ${fmtHM(S(s.end))}${label?`<span class="st-status">${label}</span>`:''}</div>
       <div class="slot-card">
         ${star}
         ${tags.length?`<div class="slot-tags">${tags.join('')}</div>`:''}
@@ -1660,13 +1678,14 @@ function bindRail(day,d0,span,shown){
   const rail=$('timeRail'); if(!rail) return;
   shown=shown||day.sessions.map((s,i)=>i);
   const mins=t=>{ const [h,m]=t.split(':').map(Number); return h*60+m; };
+  const S=t=>shiftHM(day,t);
   const jump=(clientX,smooth)=>{
     const r=rail.getBoundingClientRect();
     const t=d0 + Math.min(1,Math.max(0,(clientX-r.left)/r.width))*span;
     // session affichée couvrant cet instant, sinon la plus proche
-    let si=shown.find(i=>{ const s=day.sessions[i]; return mins(s.start)<=t && t<mins(s.end); });
+    let si=shown.find(i=>{ const s=day.sessions[i]; return mins(S(s.start))<=t && t<mins(S(s.end)); });
     if(si===undefined){ let best=1e9;
-      shown.forEach(i=>{ const s=day.sessions[i]; const d=Math.min(Math.abs(mins(s.start)-t),Math.abs(mins(s.end)-t));
+      shown.forEach(i=>{ const s=day.sessions[i]; const d=Math.min(Math.abs(mins(S(s.start))-t),Math.abs(mins(S(s.end))-t));
         if(d<best){ best=d; si=i; } }); }
     const el=$('slot-'+si);
     if(el) el.scrollIntoView({behavior:smooth?'smooth':'auto',block:'center'});
@@ -1739,7 +1758,7 @@ function vevent(day,s){
   if(s.lead) descParts.push('Formateur : '+s.lead);
   if(s.mod) descParts.push('Modérateur : '+s.mod);
   const L=['BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+icsStamp(),
-    'DTSTART:'+icsDT(day.date,s.start),'DTEND:'+icsDT(day.date,s.end),
+    'DTSTART:'+icsDT(day.date,shiftHM(day,s.start)),'DTEND:'+icsDT(day.date,shiftHM(day,s.end)),
     'SUMMARY:'+icsEsc((s.kind&&!s.brk?s.kind+' — ':'')+s.title)];
   if(descParts.length) L.push('DESCRIPTION:'+icsEsc(descParts.join('\n')));
   L.push('LOCATION:'+icsEsc([s.place,EVENT.place].filter(Boolean).join(' · ')||EVENT.place||''));
