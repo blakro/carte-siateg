@@ -367,6 +367,9 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:5;
   letter-spacing:.02em;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .slot .st-status{font-family:'Space Grotesk';font-weight:600;font-size:calc(9.5px * var(--fs));letter-spacing:.06em;
   text-transform:uppercase;padding:2px 7px;border-radius:99px;}
+.slot .fixed-tag{font-family:'Space Mono';font-size:calc(8.5px * var(--fs));letter-spacing:.05em;
+  text-transform:uppercase;padding:2px 6px;border-radius:99px;margin-left:2px;
+  background:var(--surface-2);color:var(--muted);border:1px solid var(--line);}
 .slot.now::before{background:var(--accent);border-color:var(--accent);
   box-shadow:0 0 0 4px rgba(255,76,1,.18);animation:ping 2.4s ease-out infinite;}
 .slot.now{border-left-color:var(--accent);}
@@ -770,7 +773,9 @@ const EVENT = {
    title, desc (facultatif), who[] (intervenants), mod (modérateur), brk:true pour
    les pauses/logistique. Ajoute un objet dans "days" pour une nouvelle journée.
    shift: minutes de décalage appliquées à TOUTES les sessions du jour (retard au
-   démarrage) — mets 0 quand le forum est à l'heure. */
+   démarrage) — mets 0 quand le forum est à l'heure.
+   fixed:true sur une session = heure fixe, jamais décalée (ex : pauses prière,
+   dont l'heure est astronomique). */
 const PROGRAM = {
   days: [
     {
@@ -804,7 +809,7 @@ const PROGRAM = {
           title:"Digitalisation des services publics : intégrer l'IA & les technologies géospatiales dans l'administration et l'économie nigériennes",
           who:["ANSI","Université André Salissou","NOVATECH"],
           mod:"Impact Plus" },
-        { start:"13:00", end:"14:00", brk:true, kind:"Pause",
+        { start:"13:00", end:"14:00", brk:true, fixed:true, kind:"Pause",
           title:"Prière · Pause déjeuner · Visite des stands", who:["Tous"] },
         { start:"14:00", end:"15:00", place:"Présentiel", kind:"Conférence-Panel",
           title:"IA Made in Niger : construire des solutions durables pour un Niger résilient — retours d'expériences",
@@ -817,7 +822,7 @@ const PROGRAM = {
           title:"IA, protection des enfants et données personnelles",
           who:["Ministère de la Justice et des Droits de l'Homme","UNICEF","SoRa Conseil","DGPN/PJ"],
           mod:"Sarki Excellence" },
-        { start:"16:30", end:"18:00", brk:true, kind:"Clôture",
+        { start:"16:30", end:"18:00", brk:true, fixed:true, kind:"Clôture",
           title:"Prière · Networking · Visite des stands — fin de la 1ère journée", who:["Tous"] }
       ]
     },
@@ -842,7 +847,7 @@ const PROGRAM = {
         { start:"11:00", end:"13:00", place:"Présentiel", kind:"Workshop 6", salle:"TBD",
           title:"IA générative : usages, limites et opportunités",
           lead:"ZAMOHA Nouvelles Technologies" },
-        { start:"13:00", end:"14:00", brk:true, kind:"Pause",
+        { start:"13:00", end:"14:00", brk:true, fixed:true, kind:"Pause",
           title:"Pause déjeuner · Prière · Visite des stands", who:["Tous"] },
         { start:"14:00", end:"16:00", place:"Présentiel", kind:"Workshop 7", salle:"TBD",
           title:"IA pour le marketing digital — formation en langue Haoussa",
@@ -1506,7 +1511,8 @@ let progTimer=null, progDay=null, progStarOnly=false, starred={};
 function fmtHM(t){ return t.replace(':','h'); }
 // décalage d'un jour (retard au démarrage) : renvoie l'heure "HH:MM" décalée
 function dShift(d){ return (d&&d.shift)||0; }
-function shiftHM(d,t){
+function shiftHM(d,t,s){
+  if(s&&s.fixed) return t;               // heure fixe (ex : prière) — jamais décalée
   const [h,m]=t.split(':').map(Number);
   let x=(((h*60+m+dShift(d))%1440)+1440)%1440;
   return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0');
@@ -1545,7 +1551,7 @@ function statusOf(now){
   let nextKey=null;
   const rows=[];
   PROGRAM.days.forEach((d,di)=>d.sessions.forEach((s,si)=>{
-    const st=slotDate(d.date,shiftHM(d,s.start)), en=slotDate(d.date,shiftHM(d,s.end));
+    const st=slotDate(d.date,shiftHM(d,s.start,s)), en=slotDate(d.date,shiftHM(d,s.end,s));
     let cls='next-candidate';
     if(now>en) cls='past';
     else if(now>=st && now<=en) cls='now';
@@ -1584,7 +1590,7 @@ function renderProgram(){
   html+='<div class="swipe-hint">← GLISSE POUR CHANGER DE JOUR →</div>';
 
   const day=days[progDay];
-  const S=t=>shiftHM(day,t);   // heure décalée (retard au démarrage)
+  const S=(t,s)=>shiftHM(day,t,s);   // heure décalée (retard au démarrage) — sauf sessions fixées (prière)
   if(dShift(day)) html+=`<div class="delay-note">⏱ Horaires ajustés : +${fmtDelay(dShift(day))} de retard au démarrage</div>`;
   const nStar=starCount(day);
   // filtre "Mes sessions" (visible dès qu'on a étoilé quelque chose)
@@ -1605,14 +1611,14 @@ function renderProgram(){
 
   // barre de temps : segments proportionnels, tap/glisse = saut à la session
   const mins=t=>{ const [h,m]=t.split(':').map(Number); return h*60+m; };
-  const d0=Math.floor(Math.min(...day.sessions.map(s=>mins(S(s.start))))/60)*60;
-  const d1=Math.ceil(Math.max(...day.sessions.map(s=>mins(S(s.end))))/60)*60;
+  const d0=Math.floor(Math.min(...day.sessions.map(s=>mins(S(s.start,s))))/60)*60;
+  const d1=Math.ceil(Math.max(...day.sessions.map(s=>mins(S(s.end,s))))/60)*60;
   const span=d1-d0;
   const pct=t=>((mins(t)-d0)/span*100);
   // 2 couloirs quand des sessions affichées se chevauchent (workshops en parallèle)
   const lane={}; let twoLanes=false; const used=[];
   shown.forEach(si=>{ const s=day.sessions[si];
-    let placed=0; for(const u of used){ if(mins(S(s.start))<mins(S(day.sessions[u].end)) && mins(S(s.end))>mins(S(day.sessions[u].start))){ placed=1; twoLanes=true; break; } }
+    let placed=0; for(const u of used){ const us=day.sessions[u]; if(mins(S(s.start,s))<mins(S(us.end,us)) && mins(S(s.end,s))>mins(S(us.start,us))){ placed=1; twoLanes=true; break; } }
     lane[si]=placed; if(!placed) used.push(si); });
   html+='<div class="time-wrap"><div class="time-rail" id="timeRail">';
   shown.forEach(si=>{
@@ -1620,7 +1626,7 @@ function renderProgram(){
     const top = twoLanes ? (lane[si]===0?7:29) : 8;
     const h = twoLanes ? 18 : 38;
     const star = starred[sessionKey(day,s)] ? ' star':'';
-    html+=`<span class="seg${star}" data-si="${si}" style="left:${pct(S(s.start))}%;width:${Math.max(1.2,pct(S(s.end))-pct(S(s.start)))}%;top:${top}px;height:${h}px;background:var(--cat-${catOf(s)})"></span>`;
+    html+=`<span class="seg${star}" data-si="${si}" style="left:${pct(S(s.start,s))}%;width:${Math.max(1.2,pct(S(s.end,s))-pct(S(s.start,s)))}%;top:${top}px;height:${h}px;background:var(--cat-${catOf(s)})"></span>`;
   });
   // curseur "maintenant" si on est le jour affiché, dans la plage horaire
   const nowMin=now.getHours()*60+now.getMinutes();
@@ -1659,7 +1665,7 @@ function renderProgram(){
     const ics=s.brk?'':`<button class="slot-ics" onclick="exportSession(${di},${si})">${svgCal} Ajouter au calendrier</button>`;
     const star=s.brk?'':`<button class="star-btn ${isStar?'on':''}" onclick="toggleStar(${di},${si})" aria-label="Suivre cette session">${starSvg(isStar)}</button>`;
     html+=`<div class="slot ${s.brk?'brk':''} cat-${catOf(s)} ${cls} ${isStar?'star':''}" id="slot-${si}">
-      <div class="st-time">${fmtHM(S(s.start))} – ${fmtHM(S(s.end))}${label?`<span class="st-status">${label}</span>`:''}</div>
+      <div class="st-time">${fmtHM(S(s.start,s))} – ${fmtHM(S(s.end,s))}${s.fixed?'<span class="fixed-tag">heure fixe</span>':''}${label?`<span class="st-status">${label}</span>`:''}</div>
       <div class="slot-card">
         ${star}
         ${tags.length?`<div class="slot-tags">${tags.join('')}</div>`:''}
@@ -1678,14 +1684,14 @@ function bindRail(day,d0,span,shown){
   const rail=$('timeRail'); if(!rail) return;
   shown=shown||day.sessions.map((s,i)=>i);
   const mins=t=>{ const [h,m]=t.split(':').map(Number); return h*60+m; };
-  const S=t=>shiftHM(day,t);
+  const S=(t,s)=>shiftHM(day,t,s);
   const jump=(clientX,smooth)=>{
     const r=rail.getBoundingClientRect();
     const t=d0 + Math.min(1,Math.max(0,(clientX-r.left)/r.width))*span;
     // session affichée couvrant cet instant, sinon la plus proche
-    let si=shown.find(i=>{ const s=day.sessions[i]; return mins(S(s.start))<=t && t<mins(S(s.end)); });
+    let si=shown.find(i=>{ const s=day.sessions[i]; return mins(S(s.start,s))<=t && t<mins(S(s.end,s)); });
     if(si===undefined){ let best=1e9;
-      shown.forEach(i=>{ const s=day.sessions[i]; const d=Math.min(Math.abs(mins(S(s.start))-t),Math.abs(mins(S(s.end))-t));
+      shown.forEach(i=>{ const s=day.sessions[i]; const d=Math.min(Math.abs(mins(S(s.start,s))-t),Math.abs(mins(S(s.end,s))-t));
         if(d<best){ best=d; si=i; } }); }
     const el=$('slot-'+si);
     if(el) el.scrollIntoView({behavior:smooth?'smooth':'auto',block:'center'});
@@ -1758,7 +1764,7 @@ function vevent(day,s){
   if(s.lead) descParts.push('Formateur : '+s.lead);
   if(s.mod) descParts.push('Modérateur : '+s.mod);
   const L=['BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+icsStamp(),
-    'DTSTART:'+icsDT(day.date,shiftHM(day,s.start)),'DTEND:'+icsDT(day.date,shiftHM(day,s.end)),
+    'DTSTART:'+icsDT(day.date,shiftHM(day,s.start,s)),'DTEND:'+icsDT(day.date,shiftHM(day,s.end,s)),
     'SUMMARY:'+icsEsc((s.kind&&!s.brk?s.kind+' — ':'')+s.title)];
   if(descParts.length) L.push('DESCRIPTION:'+icsEsc(descParts.join('\n')));
   L.push('LOCATION:'+icsEsc([s.place,EVENT.place].filter(Boolean).join(' · ')||EVENT.place||''));
