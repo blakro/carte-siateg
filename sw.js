@@ -1,7 +1,7 @@
 /* Carte SIATeG — service worker
    Précache le "shell" de l'app pour un lancement hors-ligne,
    et met en cache à la volée les ressources externes (polices, libs, moteur OCR). */
-const CACHE = 'carte-forum-v9';   // v9 : pauses prière à heure fixe (non décalées)
+const CACHE = 'carte-forum-v10';  // v10 : heures d'origine + bandeau d'info sur le retard
 const SHELL = [
   './',
   './index.html',
